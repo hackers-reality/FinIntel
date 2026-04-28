@@ -9,15 +9,22 @@ pip install fastapi uvicorn yfinance duckduckgo-search python-dotenv openai anth
 Write-Host "Setting up React frontend..." -ForegroundColor Yellow
 npm install
 
-# 3. Create 'finintel' command alias
-$ScriptPath = Join-Path (Get-Location) "run.py"
-$Command = "function finintel { python `"$ScriptPath`" }"
+# 3. Add to User PATH for global access
+$CurrentDir = Get-Location
+Write-Host "Adding $CurrentDir to User PATH..." -ForegroundColor Yellow
 
-# Add to PowerShell Profile
-if (!(Test-Path $PROFILE)) { New-Item -Type File -Path $PROFILE -Force }
-$ProfileContent = "`n" + $Command
-Add-Content -Path $PROFILE -Value $ProfileContent
+$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($UserPath -notlike "*$CurrentDir*") {
+    $NewPath = "$UserPath;$CurrentDir"
+    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
+    Write-Host "PATH updated successfully." -ForegroundColor Green
+} else {
+    Write-Host "Directory already in PATH." -ForegroundColor Gray
+}
 
-Write-Host "Installation Complete!" -ForegroundColor Green
-Write-Host "RESTART your terminal and type: " -NoNewline
-Write-Host "finintel" -ForegroundColor Cyan
+# 4. Create 'finintel.cmd' for global execution
+$BatchContent = "@echo off`npython `"$CurrentDir\run.py`" %*"
+Set-Content -Path "$CurrentDir\finintel.cmd" -Value $BatchContent
+
+Write-Host "`nInstallation Complete!" -ForegroundColor Green
+Write-Host "RESTART your terminal (close and reopen) to use 'finintel' anywhere." -ForegroundColor Cyan
