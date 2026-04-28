@@ -90,32 +90,37 @@ def db_session():
     try: yield conn.cursor()
     finally: conn.commit(); conn.close()
 
-# ── Intelligence Mesh (Priority: NVIDIA NIM > OpenAI) ────────────────
+# ── Intelligence Multi-Mesh (NVIDIA > Groq > Anthropic > OpenAI) ─────
 async def call_llm(messages, json_mode=False):
-    nv_key = os.getenv("NVIDIA_API_KEY")
-    oa_key = os.getenv("OPENAI_API_KEY")
+    keys = {
+        "nv": os.getenv("NVIDIA_API_KEY"),
+        "gr": os.getenv("GROQ_API_KEY"),
+        "an": os.getenv("ANTHROPIC_API_KEY"),
+        "oa": os.getenv("OPENAI_API_KEY"),
+        "gm": os.getenv("GEMINI_API_KEY")
+    }
     
-    # 1. NVIDIA NIM (Recommended: Free & Powerful Llama 3.1 405B)
-    if nv_key:
+    # 1. NVIDIA NIM (Recommended: Free & Powerful)
+    if keys["nv"]:
         try:
-            client = openai.AsyncOpenAI(api_key=nv_key, base_url="https://integrate.api.nvidia.com/v1")
-            resp = await client.chat.completions.create(
-                model="meta/llama-3.1-405b-instruct", 
-                messages=messages, 
-                response_format={"type": "json_object"} if json_mode else None
-            )
+            client = openai.AsyncOpenAI(api_key=keys["nv"], base_url="https://integrate.api.nvidia.com/v1")
+            resp = await client.chat.completions.create(model="meta/llama-3.1-405b-instruct", messages=messages, response_format={"type": "json_object"} if json_mode else None)
             return resp.choices[0].message.content
         except: pass
-    
-    # 2. OpenAI Fallback
-    if oa_key:
+        
+    # 2. Groq (High Speed Llama 3)
+    if keys["gr"]:
         try:
-            client = openai.AsyncOpenAI(api_key=oa_key)
-            resp = await client.chat.completions.create(
-                model="gpt-4o", 
-                messages=messages, 
-                response_format={"type": "json_object"} if json_mode else None
-            )
+            client = openai.AsyncOpenAI(api_key=keys["gr"], base_url="https://api.groq.com/openai/v1")
+            resp = await client.chat.completions.create(model="llama3-70b-8192", messages=messages, response_format={"type": "json_object"} if json_mode else None)
+            return resp.choices[0].message.content
+        except: pass
+
+    # 3. OpenAI Fallback
+    if keys["oa"]:
+        try:
+            client = openai.AsyncOpenAI(api_key=keys["oa"])
+            resp = await client.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"} if json_mode else None)
             return resp.choices[0].message.content
         except: pass
         

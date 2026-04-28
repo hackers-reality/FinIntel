@@ -1,42 +1,26 @@
-# 🛡️ Sovereign Intelligence Nexus (v2.4)
+# 🛡️ Sovereign Intelligence Nexus (v2.5)
 ### *Strategic Command Center for Elite Indian Retail Traders*
 
-> **Status:** Gold Master Candidate | **Build:** v2.3 | **System:** Sovereign Intelligence Nexus
+> **Status:** Gold Master | **Build:** v2.5 | **System:** Sovereign Intelligence Nexus
 
 The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence engine engineered to provide retail traders with institutional-grade edge. It synthesizes real-time market pulse, forensic document analysis, and institutional whale-tracking into a strictly utilitarian, zero-distraction tactical environment.
 
 ---
 
-## 📜 Table of Contents
-1. [Core Features](#-core-features)
-2. [The Sovereign Key Vault](#-the-sovereign-key-vault)
-3. [Zerodha Tactical Integration](#-zerodha-tactical-integration)
-4. [AI Reasoning Mesh](#-ai-reasoning-mesh)
-5. [Tactical Installation](#-tactical-installation)
-6. [API Forensic Guide](#-api-forensic-guide)
-
----
-
-## 🛡️ Core Features
-- **NVIDIA Powered:** Prioritizes **Llama 3.1 405B** via NVIDIA NIM for free, institutional-grade reasoning.
-- **Zero-Touch Auth:** Autonomous daily session synchronization using headless TOTP 2FA.
-- **Elite Domain Mesh:** Research queries weighted against high-authority finance domains.
-- **Forensic Filing Engine:** LLM-powered scanning of regulatory documents for "fine print" risks.
-- **Native OS Alerts:** High-priority Windows toast notifications for VIX spikes.
-- **Nexus Command Palette:** `Cmd+K` tactical interface for instant navigation.
-
----
-
 ## 🔑 The Sovereign Key Vault
 
-To fully ignite the Nexus, populate your `.env` file or the **Strategic Vault** UI with the following keys:
+To ignite the Nexus, populate your `.env` file or the **Strategic Vault** UI with these tactical keys:
 
 | Category | Tactical Key | Priority | Purpose |
 | :--- | :--- | :--- | :--- |
 | **Broker** | `ZERODHA_API_KEY` | **Mandatory** | Live Holdings & Position Data |
 | **Broker** | `ZERODHA_API_SECRET`| **Mandatory** | Secure Session Generation |
+| **Broker** | `ZERODHA_USER_ID` | **Recommended**| For Zero-Touch Autonomous Sync |
 | **Intelligence**| `NVIDIA_API_KEY` | **Recommended**| Free Institutional Reasoning (Llama 405B) |
-| **Intelligence**| `OPENAI_API_KEY` | **Optional** | Primary Fallback for Reasoning |
+| **Intelligence**| `GROQ_API_KEY` | **Recommended**| High-Speed Llama 3 Reasoning |
+| **Intelligence**| `ANTHROPIC_API_KEY`| **Optional** | Advanced Forensic Document Analysis |
+| **Intelligence**| `GEMINI_API_KEY` | **Optional** | Large Context Window Processing |
+| **Intelligence**| `OPENAI_API_KEY` | **Optional** | Reliable Fallback for Reasoning |
 
 ---
 
@@ -44,56 +28,50 @@ To fully ignite the Nexus, populate your `.env` file or the **Strategic Vault** 
 
 ### Phase 1: Portal Deployment
 1. **Navigate to the Portal:** Open the [Kite Connect App Dashboard](https://kite.trade/apps).
-2. **Authentication:** Log in (or create a developer account).
-3. **App Creation:** 
-   - Click the **"Create New App"** button (Top Right).
-   - **App Name:** `Sovereign Nexus`
-   - **Redirect URL:** `http://127.0.0.1` (Crucial: Must match exactly).
-   - **Postback URL:** Leave blank.
-   - **Description:** `Institutional Research Nexus`.
-4. **Key Extraction:** Once created, click on your app to find your **API Key** and **API Secret**.
+2. **Authentication:** Log in using your Zerodha credentials.
+3. **App Creation:** Click **"Create New App"** (Top Right).
+4. **The Client ID:** You will be asked for your **Zerodha Client ID**. 
+   - **Where to find it?** Open [Kite Web](https://kite.zerodha.com/), click on your Profile (Bottom Left), and your Client ID (e.g., `AB1234`) will be displayed under your name. It is also in your Welcome Email.
+5. **Redirect URL:** Set to `http://127.0.0.1` (Crucial).
+6. **Key Extraction:** Once created, click on your app to extract your **API Key** and **API Secret**.
 
 ---
 
-### Phase 2: Authentication Flows
+### Phase 2: Authentication flows
 
 #### Option A: Zero-Touch Auth (Recommended)
 1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface (`http://localhost:5173/settings`).
-2. **Inject Strategic Data:** Enter your Zerodha **User ID**, **Password**, **TOTP Secret Key**, **API Key**, and **API Secret**.
-3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. The Nexus will handle the 2FA and session autonomously.
+2. **Inject Strategic Data:** Enter your Zerodha ID, Password, TOTP Secret, API Key, and API Secret.
+3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. The Nexus handles the rest autonomously.
 
 #### Option B: Manual Handshake (Fallback)
 1. **Login URL:** Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
-2. **Authorize:** Log in and approve the request.
-3. **Extract Token:** Copy the `request_token` from the URL bar of the redirected "broken" page.
-4. **Generate Session:**
-   ```python
-   from kiteconnect import KiteConnect
-   kite = KiteConnect(api_key="YOUR_API_KEY")
-   data = kite.generate_session("YOUR_TOKEN", api_secret="YOUR_SECRET")
-   print(data["access_token"])
-   ```
+2. **Authorize:** Log in and approve.
+3. **Extract Token:** Copy the `request_token` from the URL bar of the redirected page.
+   - > [!IMPORTANT]
+   - > **Don't Worry:** The browser WILL show a "Site can't be reached" error. This is **NORMAL**. Just grab the token from the URL bar at the top and paste it into your logic.
 
 ---
 
-## 🧠 AI Reasoning Mesh
+## 🧠 AI Reasoning Multi-Mesh
 
-The Nexus v2.4 utilizes a multi-mesh reasoning strategy, prioritizing free institutional-grade power:
+The Nexus v2.5 utilizes a decentralized intelligence strategy. It automatically detects your keys and prioritizes power and cost-efficiency:
 
-1. **NVIDIA NIM (Priority 1):** Utilizes `meta/llama-3.1-405b-instruct` for free Alpha generation.
-2. **OpenAI (Priority 2):** Fallback for structural redundancy.
+1. **NVIDIA NIM (Priority 1):** Uses Llama 3.1 405B for institutional-grade verdicts.
+2. **Groq NIM (Priority 2):** Uses Llama 3 70B for ultra-fast strategic scans.
+3. **Anthropic/Gemini/OpenAI:** Seamless fallbacks for multi-turn context or forensic depth.
 
 ---
 
 ## 🛠️ Tactical Installation
 
 ### Windows (Native/PowerShell)
-1. **Environment Tuning:**
+1. **Ignite Installer:**
    ```powershell
    .\install.ps1
    ```
-2. **Ignition:** Execute `.\finintel.ps1` or `python run.py`.
+2. **Launch Nexus:** Execute `.\finintel.ps1` or `python run.py`.
 
 ---
 **Status: Sovereign & Invincible.**
-*The Nexus is Active.*
+*Powered by the Multi-Mesh Kernel.*
