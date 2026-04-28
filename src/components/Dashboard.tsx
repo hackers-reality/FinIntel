@@ -21,15 +21,16 @@ export default function Dashboard() {
   const [isResearching, setIsResearching] = useState(false);
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [chatMessage, setChatMessage] = useState('');
-  const [alerts, setAlerts] = useState<any[]>([]);
+  const [copied, setCopied] = useState(false);
   const [researchHistory, setResearchHistory] = useState<any[]>([]);
   const [savedOpportunities, setSavedOpportunities] = useState<any[]>([]);
   const [memoryStats, setMemoryStats] = useState<any[]>([]);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<{status: string, message: string} | null>(null);
   const [alertFilter, setAlertFilter] = useState('');
   const [showMA, setShowMA] = useState(true);
   const [showRSI, setShowRSI] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
-  const [copied, setCopied] = useState(false);
   const [sysSettings, setSysSettings] = useState<any>({ risk_profile: 'Moderate' });
 
   // ── Sync Engine ──────────────────────────────────────────────────
@@ -110,6 +111,33 @@ export default function Dashboard() {
   };
 
   // ── Render Components ──────────────────────────────────────────────
+  const verifyKey = async (provider: string, model: string, key: string) => {
+    setIsVerifying(true);
+    setVerifyStatus(null);
+    try {
+      const res = await fetch('http://localhost:8008/settings/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, model, key })
+      });
+      const result = await res.json();
+      setVerifyStatus(result);
+      if (result.status === 'success') {
+        // Automatically save if verification passes
+        await fetch('http://localhost:8008/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            llm_provider: provider, 
+            llm_model: model,
+            [`${provider}_api_key`]: key 
+          })
+        });
+      }
+    } catch (e) { setVerifyStatus({ status: 'error', message: 'Connection to kernel failed.' }); }
+    finally { setIsVerifying(false); }
+  };
+
   const renderOverview = () => (
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -380,25 +408,64 @@ export default function Dashboard() {
   const renderSettings = () => (
     <div className="max-w-2xl mx-auto space-y-12 py-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
        <div className="space-y-4">
-          <h2 className="text-3xl font-black tracking-tighter">System Configuration</h2>
-          <p className="text-sm text-gray-500">Configure your LLM providers and sovereign thresholds.</p>
+          <h2 className="text-3xl font-black tracking-tighter">Sovereign Settings</h2>
+          <p className="text-sm text-gray-500">Configure your LLM providers and secure your intelligence vault.</p>
        </div>
-       <div className="space-y-8">
+       
+       <div className="space-y-10">
+          <div className="space-y-6">
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Active Intelligence Provider</label>
+            <div className="grid grid-cols-1 gap-4">
+              {[
+                { id: 'nvidia', name: 'NVIDIA NIM', model: 'meta/llama-3.1-70b-instruct' },
+                { id: 'openai', name: 'OpenAI', model: 'gpt-4o' },
+                { id: 'anthropic', name: 'Anthropic', model: 'claude-3-5-sonnet' },
+                { id: 'groq', name: 'Groq Cloud', model: 'llama-3.1-70b-versatile' }
+              ].map((p) => (
+                <div key={p.id} className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] space-y-6 hover:border-white/20 transition-all">
+                   <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-3">
+                         <div className={cn("w-2 h-2 rounded-full", sysSettings.llm_provider === p.id ? "bg-emerald-400 animate-pulse" : "bg-gray-700")}></div>
+                         <h3 className="font-bold">{p.name}</h3>
+                      </div>
+                      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{p.model}</span>
+                   </div>
+                   
+                   <div className="flex space-x-3">
+                      <input 
+                        type="password" 
+                        placeholder={`Enter ${p.name} API Key...`}
+                        value={sysSettings[`${p.id}_api_key`] && sysSettings[`${p.id}_api_key`].startsWith('gAAAA') ? '••••••••••••••••' : sysSettings[`${p.id}_api_key`] || ''}
+                        onChange={(e) => setSysSettings({...sysSettings, [`${p.id}_api_key`]: e.target.value})}
+                        className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-6 py-3 text-xs outline-none focus:border-cyan-400/50 transition-all"
+                      />
+                      <button 
+                        onClick={() => verifyKey(p.id, p.model, sysSettings[`${p.id}_api_key`])}
+                        disabled={isVerifying}
+                        className="px-6 py-3 bg-cyan-400 text-black text-[10px] font-black uppercase rounded-2xl hover:scale-105 transition-all disabled:opacity-50"
+                      >
+                        {isVerifying && sysSettings.llm_provider === p.id ? 'Testing...' : 'Verify & Set'}
+                      </button>
+                   </div>
+                   
+                   {verifyStatus && sysSettings.llm_provider === p.id && (
+                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={cn("text-[10px] font-bold p-3 rounded-xl", verifyStatus.status === 'success' ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>
+                        {verifyStatus.status === 'success' ? <Check size={12} className="inline mr-2" /> : <AlertTriangle size={12} className="inline mr-2" />}
+                        {verifyStatus.message}
+                     </motion.div>
+                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-4">
              <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Risk Profile Alignment</label>
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {['Conservative', 'Moderate', 'Aggressive', 'Consensus'].map(r => (
-                  <button key={r} onClick={()=>setSysSettings({...sysSettings, risk_profile: r})} className={cn("py-3 rounded-2xl text-[10px] font-black uppercase transition-all border", sysSettings.risk_profile === r ? "bg-cyan-400 text-black border-cyan-400" : "bg-white/5 text-gray-500 border-white/5")}>{r}</button>
+                  <button key={r} onClick={() => setSysSettings({...sysSettings, risk_profile: r})} className={cn("py-3 rounded-2xl text-[10px] font-black uppercase transition-all border", sysSettings.risk_profile === r ? "bg-cyan-400 text-black border-cyan-400" : "bg-white/5 text-gray-500 border-white/5")}>{r}</button>
                 ))}
              </div>
-          </div>
-          <div className="p-8 bg-white/5 border border-white/10 rounded-[2rem] space-y-6">
-             <h3 className="font-bold">LLM Security Vault</h3>
-             <div className="space-y-2">
-                <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest">Active Provider: OpenAI GPT-4o</p>
-                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden"><div className="w-full h-full bg-emerald-400"></div></div>
-             </div>
-             <p className="text-xs text-gray-500">All keys are stored using AES-256 local encryption. No keys ever leave your machine.</p>
           </div>
        </div>
     </div>

@@ -300,15 +300,37 @@ async def get_pulse():
 @app.post("/auth/verify")
 async def verify_llm(data: Dict[str, str]):
     provider, model, key = data.get("provider"), data.get("model"), data.get("key")
-    if not key: raise HTTPException(400, "Key required")
-    enc_key = encrypt_val(key)
-    set_key(ENV_PATH, f"{provider.upper()}_API_KEY", enc_key)
-    load_dotenv(ENV_PATH)
-    res = await call_llm([{"role": "user", "content": "Hello"}])
-    if isinstance(res, dict) and "error" in res: return JSONResponse(status_code=401, content=res)
-    settings.update({"llm_provider": provider, "llm_model": model})
+@app.post("/settings/verify")
+async def verify_settings(data: Dict[str, Any]):
+    provider = data.get("provider")
+    model = data.get("model")
+    key = data.get("key")
+    
+    # Temporarily override settings for verification test
+    test_settings = {"llm_provider": provider, "llm_model": model, f"{provider}_api_key": key}
+    
+    try:
+        # Perform a tiny handshake call
+        test_msg = [{"role": "user", "content": "ping"}]
+        # We manually call the provider logic here to avoid messing with global state
+        response = await call_llm(test_msg, forced_settings=test_settings)
+        if response and not isinstance(response, dict):
+            return {"status": "success", "message": f"Successfully connected to {model} via {provider}"}
+        return {"status": "error", "message": str(response)}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/settings")
+async def save_settings(new_settings: Dict[str, Any]):
+    global settings
+    # Encrypt keys if they are new
+    for k, v in new_settings.items():
+        if "_api_key" in k and v and not v.startswith("gAAAA"):
+            new_settings[k] = encrypt_key(v)
+    
+    settings.update(new_settings)
     with open(SETTINGS_PATH, "w") as f: json.dump(settings, f)
-    return {"status": "success", "message": "Key encrypted and verified via AES-256."}
+    return {"status": "success"}
 
 @app.get("/market/compare")
 async def compare_assets(t1: str, t2: str):
