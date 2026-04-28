@@ -189,23 +189,42 @@ def check_market_events():
         except Exception as e: log_system(f"Monitor error for {ticker}: {e}")
 
 async def autonomous_sentinel_news():
-    """Autonomous Intelligence Scraper for Mega Events (Elon, Crypto, Huge Drops)"""
-    log_system("Sentinel Scanning for World Events...")
+    """Autonomous Intelligence Scraper for Indian Titans (Big Bulls), SEBI, and Global Events"""
+    log_system("Sentinel Scanning Indian Titans & Global Events...")
     try:
         with DDGS() as ddgs:
+            # Targeted Indian Market Titan Queries
             queries = [
-                "Elon Musk financial announcement today",
-                "breaking stock market crash news",
-                "new cryptocurrency launch trend",
-                "yahoo finance major earnings surprise",
-                "NIFTY 50 huge drop increase expert blogs"
+                "Vijay Kedia Ashish Kacholia latest portfolio changes 2024",
+                "Mukul Agrawal new stock picks NSE BSE",
+                "Rare Enterprises Jhunjhunwala legacy latest news",
+                "SEBI circulars today market impact",
+                "RBI policy sentiment stock market today",
+                "top 10 Indian investors latest blog posts LinkedIn",
+                "breaking news NSE BSE huge volume spike discovery",
+                "Elon Musk crypto financial announcement today"
             ]
             raw_news = []
             for q in queries:
                 raw_news.extend(list(ddgs.text(q, max_results=3)))
             
             snippets = [f"{r.get('title')}: {r.get('body')}" for r in raw_news]
-            prompt = f"Analyze these headlines for CRITICAL market-moving events. If something huge is happening (Elon, Crash, New Gem), return a JSON with 'critical': true, 'event': 'Short Title', 'summary': '1 sentence', 'tickers': [potential tickers]. If nothing critical, return 'critical': false. News: {' '.join(snippets[:10])}"
+            prompt = f"""
+            Analyze these headlines for CRITICAL Indian Market movements or Titan activity. 
+            Titan List to Watch: Vijay Kedia, Ashish Kacholia, Mukul Agrawal, Rare Enterprises, SEBI, RBI.
+            
+            Identify if any 'Big Bulls' are moving into new stocks or if regulatory shifts are occurring.
+            Synthesize all info (news, blogs, posts) into a strategic research result.
+            Return JSON: 
+            {{ 
+              'critical': true/false, 
+              'event': 'Short Title (e.g. Titan Entry: [Ticker])', 
+              'summary': 'Deeply synthesized result - why is this important and what is the trade?', 
+              'tickers': [NSE/BSE tickers found],
+              'source_consensus': 'High/Medium/Low' 
+            }}
+            News: {' '.join(snippets[:15])}
+            """
             
             res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
             analysis = json.loads(res)
@@ -213,14 +232,14 @@ async def autonomous_sentinel_news():
             if analysis.get("critical"):
                 event = analysis.get("event")
                 msg = analysis.get("summary")
-                log_system(f"🚨 SENTINEL ALERT: {event}")
+                log_system(f"🚨 SENTINEL TITAN ALERT: {event}")
                 
                 with db_session() as c:
                     c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
-                              ("WORLD", event, msg, datetime.now().isoformat()))
+                              ("TITAN", event, msg, datetime.now().isoformat()))
                 
                 if notification:
-                    notification.notify(title=f"FinIntel MEGA: {event}", message=msg, app_name="FinIntel Pro")
+                    notification.notify(title=f"FinIntel TITAN: {event}", message=msg, app_name="FinIntel Pro")
                 
                 # Auto-trigger Deep Research for tickers found
                 for ticker in analysis.get("tickers", []):

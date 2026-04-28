@@ -864,18 +864,19 @@ const Dashboard: React.FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   className={cn(
                     "flex items-center justify-between p-5 bg-white/5 rounded-3xl border transition-all group",
-                    alert.asset === 'WORLD' ? "border-amber-400/30 bg-amber-400/5" : "border-white/5 hover:border-cyan-400/30"
+                    alert.asset === 'TITAN' ? "border-amber-400/50 bg-amber-400/10 shadow-[0_0_20px_rgba(251,191,36,0.1)]" : 
+                    alert.asset === 'WORLD' ? "border-cyan-400/30 bg-cyan-400/5" : "border-white/5 hover:border-cyan-400/30"
                   )}
                 >
                   <div className="flex items-center space-x-6">
                     <div className={cn(
                       "w-10 h-10 rounded-2xl flex items-center justify-center",
-                      alert.asset === 'WORLD' ? "bg-amber-400/10" : "bg-cyan-400/10"
+                      alert.asset === 'TITAN' ? "bg-amber-400/20" : "bg-cyan-400/10"
                     )}>
-                      {alert.asset === 'WORLD' ? <Zap size={20} className="text-amber-400" /> : <Bell size={20} className="text-cyan-400" />}
+                      {alert.asset === 'TITAN' ? <Shield size={20} className="text-amber-400" /> : <Bell size={20} className="text-cyan-400" />}
                     </div>
                     <div>
-                      <p className="text-sm font-black">{alert.asset}: {alert.event}</p>
+                      <p className={cn("text-sm font-black", alert.asset === 'TITAN' ? "text-amber-400" : "")}>{alert.asset}: {alert.event}</p>
                       <p className="text-xs text-gray-400 font-medium">{alert.message}</p>
                     </div>
                   </div>
