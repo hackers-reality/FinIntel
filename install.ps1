@@ -3,7 +3,7 @@ Write-Host "🛡️ Initiating Nexus Installation..." -ForegroundColor Cyan
 
 # 1. Python Dependencies
 Write-Host "📦 Installing Kernel Dependencies..." -ForegroundColor Gray
-pip install kiteconnect pytz requests yfinance fastapi uvicorn duckduckgo_search openai cryptography winotify slowapi
+pip install kiteconnect pytz requests yfinance fastapi uvicorn duckduckgo_search openai cryptography winotify slowapi python-dotenv fpdf
 
 # 2. Node Dependencies
 Write-Host "📦 Installing Interface Dependencies..." -ForegroundColor Gray
