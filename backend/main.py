@@ -23,6 +23,8 @@ import openai
 from cryptography.fernet import Fernet
 from fpdf import FPDF
 from kiteconnect import KiteConnect
+import threading
+import time
 
 # ── Structured Logging ───────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -68,7 +70,6 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY, role TEXT, content TEXT, ts TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, asset TEXT, type TEXT, msg TEXT, ts TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS pending_events (id INTEGER PRIMARY KEY, ticker TEXT, type TEXT, description TEXT, resolution_date TEXT, status TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS morning_briefs (id INTEGER PRIMARY KEY, date TEXT, content TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS fii_dii_flow (id INTEGER PRIMARY KEY, date TEXT, fii_net REAL, dii_net REAL)")
         conn.commit()
 
@@ -101,8 +102,7 @@ async def call_llm(messages, json_mode=False):
         c.execute("SELECT value FROM settings WHERE key='openai_api_key'")
         res = c.fetchone()
         api_key = decrypt_v(res[0]) if res else os.getenv("OPENAI_API_KEY")
-    
-    if not api_key: return "API Key Missing"
+    if not api_key: return "{}"
     try:
         client = openai.AsyncOpenAI(api_key=api_key)
         resp = await client.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"} if json_mode else None)
@@ -111,63 +111,63 @@ async def call_llm(messages, json_mode=False):
 
 # ── Market Data Synthesis ────────────────────────────────────────────
 async def get_market_overview_internal():
+    # Priority: Zerodha -> yfinance
     kite = get_kite_client()
-    favs = ["^NSEI", "^BSESN", "^INDIAVIX"]
-    stocks = []
-    
-    for t in favs:
+    # Required: Nifty 50, Sensex, India VIX, USD/INR, + Favorites
+    base_tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "USDINR=X"]
+    results = []
+    for t in base_tickers:
         try:
             h = yf.Ticker(t).history(period="1d")
             if not h.empty:
                 cur, op = h['Close'].iloc[-1], h['Open'].iloc[0]
-                stocks.append({"symbol": t, "price": cur, "change": ((cur-op)/op)*100})
-        except: pass
-    
-    sectors = []
-    for s, idx in {"Nifty Bank": "^CNXBANK", "Nifty IT": "^CNXIT", "Nifty Auto": "^CNXAUTO"}.items():
-        try:
-            h = yf.Ticker(idx).history(period="1d")
-            if not h.empty: sectors.append({"name": s, "sentiment": ((h['Close'].iloc[-1]-h['Open'].iloc[0])/h['Open'].iloc[0])*100})
+                results.append({"symbol": t, "price": cur, "change": ((cur-op)/op)*100})
         except: pass
         
-    return {"Stocks": stocks, "categories": sectors, "market_status": "OPEN" if is_market_open() else "CLOSED"}
+    sectors = []
+    for s, idx in {"Bank": "^CNXBANK", "IT": "^CNXIT", "Auto": "^CNXAUTO", "Pharma": "^CNXPHARMA"}.items():
+        try:
+            h = yf.Ticker(idx).history(period="1d")
+            if not h.empty:
+                cur, op = h['Close'].iloc[-1], h['Open'].iloc[0]
+                sectors.append({"name": s, "sentiment": round(((cur-op)/op)*100, 2)})
+        except: pass
+        
+    return {"Stocks": results, "categories": sectors, "market_status": "OPEN" if is_market_open() else "CLOSED"}
 
-# ── Background Task Runner (Sentinel) ────────────────────────────────
-def sentinel_thread():
-    """Sync Sentinel Thread for News & Market Hours Awareness"""
+# ── Synchronous Sentinel Thread ──────────────────────────────────────
+def sentinel_sync_loop():
     while True:
         try:
             now = datetime.now(IST)
-            log_system(f"Sentinel Pulse: {now.isoformat()}")
+            log_system(f"Sentinel Active: {now.isoformat()}")
             
-            # Scrape FII/DII at 6 PM
-            if now.hour == 18 and now.minute == 0:
-                with DDGS() as ddgs:
-                    fii = list(ddgs.text("FII DII net buy sell today NSE India", max_results=1))
-                    if fii:
-                        with db_session() as c:
-                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("FII/DII", "STRATEGIC", fii[0]['body'][:200], now.isoformat()))
-            
-            # VIX Monitoring every 5 min
-            if is_market_open() and now.minute % 5 == 0:
+            # 1. Market Hours Alert (VIX above 20)
+            if is_market_open():
                 vix = yf.Ticker("^INDIAVIX").history(period="1d")
                 if not vix.empty and vix['Close'].iloc[-1] > 20:
                     with db_session() as c:
-                        c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "HIGH VOLATILITY - REDUCE POSITION SIZE", now.isoformat()))
+                        c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "HIGH VOLATILITY SPIKE (>20). REDUCE EXPOSURE.", now.isoformat()))
             
-            time.sleep(900) # Run every 15 min
+            # 2. Daily FII/DII Scrape at 6 PM IST
+            if now.hour == 18 and now.minute <= 15:
+                # Fallback to DDGS if direct NSE fails
+                with DDGS() as ddgs:
+                    fii_data = list(ddgs.text("FII DII net data today NSE", max_results=1))
+                    if fii_data:
+                        with db_session() as c:
+                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("MARKET", "FII_DII", fii_data[0]['body'][:200], now.isoformat()))
+            
+            time.sleep(900) # 15 Minute Cycle
         except Exception as e:
-            log_system(f"Sentinel Error: {str(e)}", "ERROR")
+            log_system(f"Sentinel Loop Fault: {str(e)}", "ERROR")
             time.sleep(60)
 
-import threading
-import time
-
-# ── App Definition ───────────────────────────────────────────────────
+# ── App Lifespan ─────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    threading.Thread(target=sentinel_thread, daemon=True).start()
+    threading.Thread(target=sentinel_sync_loop, daemon=True).start()
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -176,68 +176,38 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allo
 @app.get("/market/overview")
 async def market_overview(): return await get_market_overview_internal()
 
+@app.get("/market/research/{ticker}")
+@limiter.limit("10/hour")
+async def deep_research(ticker: str, request: Request):
+    t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
+    info = t.info
+    with DDGS() as ddgs: news = str(list(ddgs.text(f"{ticker} stock latest news filings", max_results=5)))
+    
+    prompt = [{"role": "system", "content": "You are a professional equity researcher. Analyze the stock using the data. Return JSON with EXACT keys: Score, Verdict, Summary, Investment_Rationale, Strategy, Risks, Target_Price, Moat_Score."},
+              {"role": "user", "content": f"Data: {info}. News: {news}"}]
+    res = await call_llm(prompt, json_mode=True)
+    return json.loads(res)
+
 @app.get("/market/zerodha/holdings")
 async def zerodha_holdings():
-    kite = get_kite_client()
-    if not kite: return []
-    try: return kite.holdings()
-    except: return []
+    k = get_kite_client()
+    return k.holdings() if k else []
 
 @app.post("/analyze/document")
 async def analyze_document(data: Dict):
-    text = data.get("text", "")
-    prompt = [{"role": "system", "content": "You are a legal financial analyst. Extract risk clauses, court cases, regulatory flags, and sentiment verdict in JSON."},
-              {"role": "user", "content": text}]
+    prompt = [{"role": "system", "content": "Analyze document for fine print. Return JSON: risk_clauses, court_case_mentions, regulatory_flags, sentiment_verdict."},
+              {"role": "user", "content": data.get("text", "")}]
     res = await call_llm(prompt, json_mode=True)
     return json.loads(res)
 
 @app.get("/market/behavior/{ticker}")
 async def get_behavior(ticker: str):
-    t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
-    h = t.history(period="20d")
+    h = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS").history(period="20d")
     if h.empty: return {"status": "NEUTRAL"}
-    
     vol_avg = h['Volume'].mean()
-    vol_today = h['Volume'].iloc[-1]
-    score = (vol_today / vol_avg)
-    
-    pattern = "CONSOLIDATION"
-    if h['Close'].iloc[-1] > h['Close'].max() * 0.98: pattern = "BREAKOUT"
-    elif h['Close'].iloc[-1] < h['Close'].min() * 1.02: pattern = "DISTRIBUTION"
-    
-    return {
-        "score": round(score, 2),
-        "pattern": pattern,
-        "status": "ACCUMULATION" if score > 1.5 and h['Close'].iloc[-1] > h['Open'].iloc[-1] else "NEUTRAL"
-    }
-
-@app.get("/market/events/{ticker}")
-async def get_events(ticker: str):
-    with db_session() as c:
-        c.execute("SELECT type, description, resolution_date, status FROM pending_events WHERE ticker = ? AND status = 'pending'", (ticker,))
-        return [{"type": r[0], "desc": r[1], "date": r[2], "status": r[3]} for r in c.fetchall()]
-
-@app.post("/market/events")
-async def create_event(data: Dict):
-    with db_session() as c:
-        c.execute("INSERT INTO pending_events (ticker, type, description, resolution_date, status) VALUES (?, ?, ?, ?, ?)",
-                  (data['ticker'], data['type'], data['desc'], data['date'], 'pending'))
-    return {"status": "success"}
-
-@app.get("/market/research/{ticker}")
-@limiter.limit("10/hour")
-async def deep_research(ticker: str, request: Request):
-    # Expanded Research with actual data
-    t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
-    info = t.info
-    news = ""
-    with DDGS() as ddgs:
-        news = str(list(ddgs.text(f"{ticker} stock news today", max_results=3)))
-    
-    prompt = [{"role": "system", "content": "Analyze ticker with data. Return JSON: Score, Verdict, Summary, Investment_Rationale, Strategy, Risks, Target_Price, Moat_Score."},
-              {"role": "user", "content": f"Data: {info}. News: {news}"}]
-    res = await call_llm(prompt, json_mode=True)
-    return json.loads(res)
+    vol_now = h['Volume'].iloc[-1]
+    score = vol_now / vol_avg
+    return {"score": round(score, 2), "status": "ACCUMULATION" if score > 1.5 and h['Close'].iloc[-1] > h['Open'].iloc[-1] else "NEUTRAL"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
