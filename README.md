@@ -7,38 +7,11 @@ The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence en
 
 ---
 
-## 🗺️ System Architecture (The Nexus Map)
-
-```mermaid
-graph TD
-    subgraph "External Intelligence Mesh"
-        A[Zerodha KiteConnect] -->|Live Holdings/Positions| E[Intelligence Kernel]
-        B[yfinance] -->|Indices/VIX/Forex| E
-        C[Elite Domain Mesh] -->|High-Authority Research| E
-        D[NVIDIA NIM Mesh] -->|Alpha Synthesis/Verdict| E
-    end
-
-    subgraph "Intelligence Kernel (Python/FastAPI)"
-        E -->|WebSocket Pulse| F[Tactical Interface]
-        E -->|SQLite Sync| G[(Nexus DB)]
-        E -->|Sentinel Loop| H[Native Toast Alerts]
-        E -->|Autonomous Auth| I[Zero-Touch Kernel]
-    end
-
-    subgraph "Tactical Interface (React/Vite)"
-        F -->|Filing Forensics| J[Risk Analysis]
-        F -->|Strategic Vault| K[Secure Settings]
-        F -->|Cmd+K Palette| L[Action Nerve Center]
-    end
-```
-
----
-
 ## 📜 Table of Contents
 1. [Core Features](#-core-features)
-2. [Strategic Components](#-strategic-components)
-3. [NVIDIA NIM: The Reasoning Mesh](#-nvidia-nim-the-reasoning-mesh)
-4. [Zerodha Tactical Integration](#-zerodha-tactical-integration)
+2. [The Sovereign Key Vault](#-the-sovereign-key-vault)
+3. [Zerodha Tactical Integration](#-zerodha-tactical-integration)
+4. [AI Reasoning Mesh](#-ai-reasoning-mesh)
 5. [Tactical Installation](#-tactical-installation)
 6. [API Forensic Guide](#-api-forensic-guide)
 
@@ -46,45 +19,71 @@ graph TD
 
 ## 🛡️ Core Features
 - **NVIDIA Powered:** Prioritizes **Llama 3.1 405B** via NVIDIA NIM for free, institutional-grade reasoning.
-- **Zerodha Kite Pulse:** Native tracking of live holdings and positions.
 - **Zero-Touch Auth:** Autonomous daily session synchronization using headless TOTP 2FA.
 - **Elite Domain Mesh:** Research queries weighted against high-authority finance domains.
 - **Forensic Filing Engine:** LLM-powered scanning of regulatory documents for "fine print" risks.
 - **Native OS Alerts:** High-priority Windows toast notifications for VIX spikes.
+- **Nexus Command Palette:** `Cmd+K` tactical interface for instant navigation.
 
 ---
 
-## 🧠 NVIDIA NIM: The Reasoning Mesh
+## 🔑 The Sovereign Key Vault
 
-The Nexus v2.4 is engineered for **NVIDIA NIM Priority**. By leveraging the Llama 3.1 405B model, the system achieves "Gold Standard" reasoning without the token costs of traditional providers.
+To fully ignite the Nexus, populate your `.env` file or the **Strategic Vault** UI with the following keys:
 
-| Provider | Model (Nexus Priority) | Variable |
-| :--- | :--- | :--- |
-| **NVIDIA** | **Llama 3.1 405B Instruct** | `NVIDIA_API_KEY` |
-| **OpenAI** | GPT-4o (Fallback) | `OPENAI_API_KEY` |
-
-> [!IMPORTANT]
-> The Nexus Kernel automatically detects your `NVIDIA_API_KEY` and utilizes the **NVIDIA Intelligence Mesh** as its primary engine. If NVIDIA credits are exhausted, it seamlessly falls back to OpenAI or Gemini.
+| Category | Tactical Key | Priority | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Broker** | `ZERODHA_API_KEY` | **Mandatory** | Live Holdings & Position Data |
+| **Broker** | `ZERODHA_API_SECRET`| **Mandatory** | Secure Session Generation |
+| **Intelligence**| `NVIDIA_API_KEY` | **Recommended**| Free Institutional Reasoning (Llama 405B) |
+| **Intelligence**| `OPENAI_API_KEY` | **Optional** | Primary Fallback for Reasoning |
+| **Intelligence**| `ANTHROPIC_API_KEY`| **Optional** | Forensic Document Analysis |
+| **Intelligence**| `GEMINI_API_KEY` | **Optional** | Multimodal Context Handling |
 
 ---
 
-## 🔑 Zerodha Tactical Integration
+## ⚡ Zerodha Tactical Integration
 
+The Nexus supports two distinct authentication flows for your daily session:
+
+### Option A: Zero-Touch Auth (Recommended)
 1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface.
 2. **Inject Strategic Data:** Enter your Zerodha Client ID, Password, and TOTP Secret Key.
-3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. 
+3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. The Nexus will handle the 2FA and session autonomously.
+
+### Option B: Manual Handshake (Fallback)
+1. **Developer Portal:** Set **Redirect URL** to `http://127.0.0.1` at [kite.trade](https://kite.trade/).
+2. **Login URL:** Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
+3. **Extract Token:** Copy the `request_token` from the URL bar of the redirected page (ignore the "site can't be reached" error).
+4. **Generate Session:**
+   ```python
+   from kiteconnect import KiteConnect
+   kite = KiteConnect(api_key="YOUR_API_KEY")
+   data = kite.generate_session("YOUR_TOKEN", api_secret="YOUR_SECRET")
+   print(data["access_token"])
+   ```
+5. **Inject:** Update `ZERODHA_ACCESS_TOKEN` in your `.env`.
+
+---
+
+## 🧠 AI Reasoning Mesh
+
+The Nexus v2.4 utilizes a multi-mesh reasoning strategy, prioritizing free institutional-grade power:
+
+1. **NVIDIA NIM (Priority 1):** Utilizes `meta/llama-3.1-405b-instruct`. 
+2. **OpenAI (Priority 2):** Fallback to `gpt-4o` for structural redundancy.
+3. **Anthropic/Gemini:** Integrated for specialized forensic arbitration.
 
 ---
 
 ## 🛠️ Tactical Installation
 
 ### Windows (Native/PowerShell)
-1. **Prerequisites:** Install Python 3.10+ and Node.js 20+.
-2. **Environment Tuning:**
+1. **Environment Tuning:**
    ```powershell
    .\install.ps1
    ```
-3. **Ignition:** Execute `.\finintel.ps1` or `python run.py`.
+2. **Ignition:** Execute `.\finintel.ps1` or `python run.py`.
 
 ---
 
@@ -99,4 +98,4 @@ The Nexus v2.4 is engineered for **NVIDIA NIM Priority**. By leveraging the Llam
 
 ---
 **Status: Sovereign & Invincible.**
-*Powered by NVIDIA NIM.*
+*The Nexus is Active.*
