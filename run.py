@@ -1,4 +1,4 @@
-import subprocess, time, webbrowser, os, sys, shutil, socket
+import subprocess, time, webbrowser, os, sys, socket
 from datetime import datetime
 
 def is_port_open(port):
@@ -9,72 +9,56 @@ def init_env():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     env_path = os.path.join(base_dir, ".env")
     required_keys = [
+        "ZERODHA_API_KEY",
+        "ZERODHA_ACCESS_TOKEN",
         "OPENAI_API_KEY",
-        "ANTHROPIC_API_KEY",
-        "GEMINI_API_KEY",
-        "GROQ_API_KEY",
-        "NVIDIA_NIM_API_KEY"
+        "NVIDIA_API_KEY"
     ]
-    
     if not os.path.exists(env_path):
         with open(env_path, "w") as f:
-            for key in required_keys:
-                f.write(f"{key}=\n")
-        print(f"📄 Created .env with {len(required_keys)} provider placeholders.")
+            for key in required_keys: f.write(f"{key}=\n")
+        print(f"📄 Created .env with {len(required_keys)} Nexus Tactical Key placeholders.")
 
 def run():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     init_env()
     
-    print("\n" + "="*50)
-    print("🚀 FININTEL PRO: SOVEREIGN COMMAND CENTER")
+    print("\n" + "🛡️ " + "="*50)
+    print("🚀 SOVEREIGN INTELLIGENCE NEXUS (v2.3)")
     print("="*50)
 
-    # Pre-flight Check
-    if is_port_open(8008):
-        print("⚠️  Warning: Port 8008 (Backend) is already active.")
-    if is_port_open(5173):
-        print("⚠️  Warning: Port 5173 (Frontend) is already active.")
-
-    # Start Backend Kernel
-    print("📡 Initializing Intelligence Kernel...")
+    # 1. Start Backend Kernel
+    print("📡 Igniting Intelligence Kernel...")
     backend_path = os.path.join(base_dir, "backend", "main.py")
     backend_proc = subprocess.Popen([sys.executable, backend_path])
 
-    # Start Frontend Interface
-    print("🖥️  Booting Strategic Interface...")
-    if not os.path.exists(os.path.join(base_dir, "node_modules")):
-        print("📦 node_modules missing. Restoring dependencies...")
-        subprocess.run(["npm", "install"], cwd=base_dir, shell=True)
+    # 2. Start Tactical Interface
+    print("🖥️  Booting Tactical Interface...")
     frontend_proc = subprocess.Popen(["npm", "run", "dev"], cwd=base_dir, shell=True)
 
-    print("⏳ Synchronizing services...")
+    print("⏳ Synchronizing Nexus Mesh...")
     ready = False
     for i in range(60):
-        b_ready = is_port_open(8008)
-        f_ready = is_port_open(5173)
-        if b_ready and f_ready:
+        if is_port_open(8008) and is_port_open(5173):
             ready = True
             break
         time.sleep(1)
-        if i % 5 == 0: print(f"   [Waiting... Kernel: {'OK' if b_ready else '...'} | UI: {'OK' if f_ready else '...'}]")
+        if i % 5 == 0: print(f"   [Mesh Sync: Backend {'OK' if is_port_open(8008) else '...'} | UI {'OK' if is_port_open(5173) else '...'}]")
 
     if ready:
-        print("\n✅ SYSTEM ONLINE")
+        print("\n✅ NEXUS ONLINE")
         webbrowser.open("http://localhost:5173")
-        print("🌍 Command Center: http://localhost:5173")
-        print("⚙️  Intelligence API: http://localhost:8008")
+        print("🌍 Nexus Command: http://localhost:5173")
     else:
-        print("\n❌ TIMEOUT: Services failed to synchronize in 60s.")
+        print("\n❌ MESH TIMEOUT: Synchronization failed.")
 
     try:
         backend_proc.wait()
         frontend_proc.wait()
     except KeyboardInterrupt:
-        print("\n🛑 SHUTTING DOWN SYSTEM...")
+        print("\n🛑 SHUTTING DOWN...")
         backend_proc.terminate()
         frontend_proc.terminate()
-        print("👋 Standby mode engaged.")
 
 if __name__ == "__main__":
     run()

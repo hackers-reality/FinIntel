@@ -1,0 +1,13 @@
+kiteconnect
+pytz
+requests
+yfinance
+fastapi
+uvicorn
+duckduckgo_search
+openai
+cryptography
+winotify
+slowapi
+python-dotenv
+fpdf
