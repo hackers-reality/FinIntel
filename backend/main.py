@@ -102,6 +102,22 @@ class SmartCache:
 
 CACHE = SmartCache(ttl=600)
 
+# ── Elite Financial Source Matrix (MEGA PROJECT EXCLUSIVE) ─────────────
+ELITE_SOURCES = [
+    "economictimes.indiatimes.com", "livemint.com", "moneycontrol.com", "business-standard.com",
+    "ndtvprofit.com", "zeebiz.com", "thehindubusinessline.com", "businesstoday.in",
+    "financialexpress.com", "pulse.zerodha.com", "forbesindia.com", "bqprime.com",
+    "businessinsider.in", "timesofindia.indiatimes.com", "ibef.org", "the-ken.com",
+    "finshots.in", "capitalmind.in", "freefincal.com", "in.investing.com",
+    "nseindia.com", "bseindia.com", "mcxindia.com", "ncdex.com", "sebi.gov.in",
+    "rbi.org.in", "equitymaster.com", "tradebrains.in", "tickertape.in", "groww.in",
+    "5paisa.com", "investorji.in", "myinvestmentideas.com", "alphaideas.in",
+    "tavaga.com", "gauravblog.com", "brameshtechanalysis.com", "gale.in",
+    "abovestocks.com", "investmentguruindia.com", "smartinvestor.in", "equitypandit.com",
+    "icicidirect.com", "hdfcsec.com", "angelone.in", "sharekhan.com",
+    "rmoneyindia.com", "coindcx.com", "wazirx.com", "tradingview.com"
+]
+
 def log_system(msg):
     with open(LOG_PATH, "a") as f:
         f.write(f"[{datetime.now().isoformat()}] {msg}\n")
@@ -219,16 +235,15 @@ async def autonomous_sentinel_news():
     log_system("Sentinel Scanning Indian Titans & Global Events...")
     try:
         with DDGS() as ddgs:
-            # Targeted Intelligence Queries
+            # Targeted Intelligence Queries using ELITE_SOURCES Matrix
+            sampled = random.sample(ELITE_SOURCES, 10)
             queries = [
-                "Elon Musk Twitter official company announcement",
-                "Michael Saylor Bitcoin MicroStrategy institutional purchase",
-                "Cathie Wood Ark Invest latest stock trade",
-                "Jensen Huang NVIDIA CEO news",
-                "Vijay Kedia Ashish Kacholia portfolio changes",
-                "breaking crypto news upcoming market catalysts",
-                "SEBI circulars market impact today",
-                "insider news upcoming tech IPO India"
+                f"site:{sampled[0]} Elon Musk crypto announcement May 1st",
+                f"site:{sampled[1]} Vijay Kedia Mukul Agrawal latest portfolio",
+                f"site:{sampled[2]} Ashish Kacholia new multibagger discovery",
+                f"site:{sampled[3]} SEBI RBI regulatory shift today",
+                f"site:{sampled[4]} MicroStrategy Michael Saylor Bitcoin purchase",
+                f"site:{sampled[5]} upcoming crypto newbie currency launch"
             ]
             raw_news = []
             for q in queries:
@@ -401,10 +416,16 @@ async def deep_research(ticker: str):
             with DDGS() as ddgs: return [r.get('body', '') for r in ddgs.text(q, max_results=5)]
         
         t1_info = await asyncio.to_thread(lambda: yf.Ticker(sym).info)
+        
+        # Source Matrix Search
+        sampled_sites = random.sample(ELITE_SOURCES, 8)
+        news_q = " OR ".join([f"site:{s}" for s in sampled_sites[:4]])
+        sentiment_q = " OR ".join([f"site:{s}" for s in sampled_sites[4:]])
+        
         t2_news, t3_social, t4_finance = await asyncio.gather(
-            asyncio.to_thread(ddg_search, f"{ticker} stock expert analysis news 2024"),
-            asyncio.to_thread(ddg_search, f"{ticker} stock reddit twitter sentiment"),
-            asyncio.to_thread(ddg_search, f"{ticker} company financial health investments where they invest")
+            asyncio.to_thread(ddg_search, f"({news_q}) {ticker} news"),
+            asyncio.to_thread(ddg_search, f"({sentiment_q}) {ticker} sentiment analysis"),
+            asyncio.to_thread(ddg_search, f"{ticker} financial health roadmap")
         )
         
         lang = settings.get("language", "English")

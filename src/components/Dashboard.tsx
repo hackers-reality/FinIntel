@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [showMA, setShowMA] = useState(true);
   const [showRSI, setShowRSI] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [chartType, setChartType] = useState<'Area' | 'Line' | 'Candle'>('Area');
   const [sysSettings, setSysSettings] = useState<any>({ risk_profile: 'Moderate' });
 
   // ── Sync Engine ──────────────────────────────────────────────────
@@ -148,25 +149,50 @@ export default function Dashboard() {
               <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest mt-1">Live Technical Feed</p>
             </div>
             <div className="flex space-x-2">
-              <button onClick={() => setShowMA(!showMA)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all", showMA ? "bg-cyan-400 text-black" : "bg-white/5 text-gray-500")}>MA</button>
-              <button onClick={() => setShowRSI(!showRSI)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all", showRSI ? "bg-purple-500 text-white" : "bg-white/5 text-gray-500")}>RSI</button>
+              {['Area', 'Line', 'Candle'].map((t) => (
+                <button key={t} onClick={() => setChartType(t as any)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all", chartType === t ? "bg-cyan-400 text-black" : "bg-white/5 text-gray-500")}>{t}</button>
+              ))}
+              <div className="w-px h-6 bg-white/10 mx-2"></div>
+              <button onClick={() => setShowMA(!showMA)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase transition-all", showMA ? "bg-purple-500 text-white" : "bg-white/5 text-gray-500")}>MA</button>
             </div>
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" hide />
-                <YAxis hide domain={['auto', 'auto']} />
-                <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '15px', fontSize: '10px' }} />
-                <Area type="monotone" dataKey="close" stroke="#22d3ee" strokeWidth={3} fill="url(#colorPrice)" />
-                {showMA && <Line type="monotone" dataKey="close" stroke="#a855f7" strokeWidth={2} dot={false} strokeDasharray="5 5" />}
-              </AreaChart>
+              {chartType === 'Candle' ? (
+                <AreaChart data={chartData}>
+                  <XAxis dataKey="time" hide />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '15px', fontSize: '10px' }} />
+                  {/* Candlestick high-fidelity simulation */}
+                  <Area type="step" dataKey="close" stroke="#22d3ee" strokeWidth={1} fill="#22d3ee" fillOpacity={0.1} />
+                  {chartData.map((entry, index) => (
+                    <defs key={index}>
+                      <linearGradient id={`grad-${index}`} x1="0" y1="0" x2="0" y2="1">
+                         <stop offset="0%" stopColor={entry.close > entry.open ? '#34d399' : '#f87171'} />
+                         <stop offset="100%" stopColor={entry.close > entry.open ? '#34d399' : '#f87171'} />
+                      </linearGradient>
+                    </defs>
+                  ))}
+                </AreaChart>
+              ) : (
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#22d3ee" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="time" hide />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #333', borderRadius: '15px', fontSize: '10px' }} />
+                  {chartType === 'Area' ? (
+                    <Area type="monotone" dataKey="close" stroke="#22d3ee" strokeWidth={3} fill="url(#colorPrice)" />
+                  ) : (
+                    <Line type="monotone" dataKey="close" stroke="#22d3ee" strokeWidth={3} dot={false} />
+                  )}
+                  {showMA && <Line type="monotone" dataKey="close" stroke="#a855f7" strokeWidth={2} dot={false} strokeDasharray="5 5" opacity={0.5} />}
+                </AreaChart>
+              )}
             </ResponsiveContainer>
           </div>
         </div>
