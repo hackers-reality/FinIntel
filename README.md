@@ -35,15 +35,18 @@ To activate the live portfolio and institutional data stream, follow these steps
 ### 1. Developer Account
 - Go to [Kite Connect Developer Portal](https://kite.trade/).
 - Create an account and log in.
-- **Create a New App:** Provide a name and set the **Redirect URL** to `http://127.0.0.1`.
-- Note your **API Key** and **API Secret**.
+- **Create a New App:** Provide a name and set the **Redirect URL** to `http://127.0.0.1`. 
+  > [!IMPORTANT]
+  > Ensure this matches your Kite Dashboard *exactly*. If you use `http://localhost` in the dashboard, you must use it in your mental flow as well.
 
 ### 2. Manual Access Token Generation
 Zerodha requires a fresh `access_token` daily. Follow this flow to generate it:
 1.  **Login URL:** Open this in your browser:  
     `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`
 2.  **Authorize:** Log in with your Zerodha credentials.
-3.  **Extract Request Token:** You will be redirected to `http://127.0.0.1/?request_token=XXXXX`. Copy the `request_token`.
+3.  **Extract Request Token:** You will be redirected to `http://127.0.0.1/?request_token=XXXXX`. 
+    > [!WARNING]
+    > The browser will show **"This site can't be reached"**. This is **EXPECTED**. Look at the URL bar at the top of your browser; the `request_token` is right there. Copy it.
 4.  **Generate Access Token:** Use the following Python command to get your token:
     ```python
     from kiteconnect import KiteConnect
