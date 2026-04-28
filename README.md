@@ -106,7 +106,7 @@ finintel-pro/
 
 ### 2. Automated Install
 1. **Open a Terminal** (PowerShell or Command Prompt).
-2. **CD into the Root Directory:** You MUST be in the `finintel-pro` root folder.
+2. **CD into the Root Directory:** You MUST be in the `finintel-pro` root folder for the installation only.
    ```bash
    cd E:\finintel-pro
    ```
@@ -115,8 +115,8 @@ finintel-pro/
    .\install.ps1
    ```
 
-### 3. Global Command
-Once installed, you can launch the engine from any directory:
+### 3. Global Command (Run from Anywhere)
+Once the installation is complete, the `finintel` command is added to your System PATH. You can now launch the engine from **any directory or any terminal** just by typing:
 ```bash
 finintel
 ```
