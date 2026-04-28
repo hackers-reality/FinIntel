@@ -486,11 +486,18 @@ export default function Dashboard() {
           </div>
 
           <div className="space-y-4">
-             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Risk Profile Alignment</label>
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {['Conservative', 'Moderate', 'Aggressive', 'Consensus'].map(r => (
-                  <button key={r} onClick={() => setSysSettings({...sysSettings, risk_profile: r})} className={cn("py-3 rounded-2xl text-[10px] font-black uppercase transition-all border", sysSettings.risk_profile === r ? "bg-cyan-400 text-black border-cyan-400" : "bg-white/5 text-gray-500 border-white/5")}>{r}</button>
-                ))}
+             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Intelligence Pulse</label>
+             <div className="p-8 bg-white/5 border border-white/10 rounded-[2rem] flex items-center justify-between">
+                <div>
+                   <h3 className="font-bold">Global Notifications</h3>
+                   <p className="text-xs text-gray-500 mt-1">Receive desktop alerts for Big Bull movements and volatility spikes.</p>
+                </div>
+                <button 
+                  onClick={() => setSysSettings({...sysSettings, notifications_enabled: !sysSettings.notifications_enabled})}
+                  className={cn("w-16 h-8 rounded-full transition-all relative", sysSettings.notifications_enabled ? "bg-cyan-400" : "bg-gray-700")}
+                >
+                  <div className={cn("absolute top-1 w-6 h-6 bg-white rounded-full transition-all", sysSettings.notifications_enabled ? "left-9" : "left-1")}></div>
+                </button>
              </div>
           </div>
        </div>
@@ -524,13 +531,13 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
-        <div className="flex items-center space-x-6">
-           <div className="text-right">
-              <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">System Load</p>
-              <p className="text-xs font-black text-emerald-400">OPTIMAL</p>
-           </div>
-           <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400"><Menu size={20} /></div>
-        </div>
+                <div className="flex space-x-3">
+                   <div className="text-right">
+                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Active Mesh Node</p>
+                      <p className="text-xs font-black text-cyan-400 uppercase">{researchResult?.provider || sysSettings.llm_provider}</p>
+                   </div>
+                   <div className="w-10 h-10 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400"><Menu size={20} /></div>
+                </div>
       </nav>
 
       {/* ── Main Content Area ─────────────────────────────────────── */}

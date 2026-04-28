@@ -123,35 +123,59 @@ def log_system(msg):
         f.write(f"[{datetime.now().isoformat()}] {msg}\n")
 
 # ── LLM Orchestration ────────────────────────────────────────────────
-async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False):
-    provider = settings.get("llm_provider", "openai")
-    model = settings.get("llm_model")
-    raw_key = os.getenv(f"{provider.upper()}_API_KEY")
-    api_key = decrypt_val(raw_key)
-    
-    if not api_key: return {"error": f"API Key for {provider} not found."}
+# ── Multi-Provider Mesh Logic ──────────────────────────────────────────
+PROVIDER_PRIORITY = ["nvidia", "openai", "anthropic", "groq"]
 
-    try:
-        if provider in ["openai", "groq", "nvidia_nim"]:
-            base_url = None
-            if provider == "groq": base_url = "https://api.groq.com/openai/v1"
-            elif provider == "nvidia_nim": base_url = "https://integrate.api.nvidia.com/v1"
-            
-            client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
-            args = {"model": model, "messages": messages, "timeout": 20.0}
-            if json_mode: args["response_format"] = {"type": "json_object"}
-            
-            response = await client.chat.completions.create(**args)
-            return response.choices[0].message.content
-        elif provider == "anthropic":
-            client = anthropic.AsyncAnthropic(api_key=api_key)
-            sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "Expert Advisor")
-            filtered = [m for m in messages if m["role"] != "system"]
-            response = await client.messages.create(model=model, system=sys_msg, messages=filtered, max_tokens=2048)
-            return response.content[0].text
-    except Exception as e:
-        log_system(f"LLM Error: {e}")
-        return {"error": str(e)}
+async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False, task_type: str = "general", forced_settings: Optional[Dict] = None):
+    """Resilient Multi-Provider Mesh with Auto-Fallback & Retry"""
+    active_settings = forced_settings or settings
+    primary_provider = active_settings.get("llm_provider", "openai")
+    
+    # Task-Based Model Selection
+    TASK_MODELS = {
+        "sentinel": {"groq": "llama-3.1-70b-versatile", "nvidia": "meta/llama-3.1-70b-instruct"},
+        "research": {"nvidia": "meta/llama-3.1-70b-instruct", "openai": "gpt-4o", "anthropic": "claude-3-5-sonnet-20240620"},
+        "general": {"openai": "gpt-4o", "groq": "llama-3.1-70b-versatile"}
+    }
+
+    providers_to_try = [primary_provider] + [p for p in PROVIDER_PRIORITY if p != primary_provider]
+    
+    for provider in providers_to_try:
+        raw_key = os.getenv(f"{provider.upper()}_API_KEY") or active_settings.get(f"{provider}_api_key")
+        if not raw_key: continue
+        
+        api_key = decrypt_val(raw_key)
+        model = TASK_MODELS.get(task_type, {}).get(provider) or active_settings.get("llm_model")
+        if not model: continue
+
+        for attempt in range(3):
+            try:
+                if provider in ["openai", "groq", "nvidia"]:
+                    base_url = None
+                    if provider == "groq": base_url = "https://api.groq.com/openai/v1"
+                    elif provider == "nvidia": base_url = "https://integrate.api.nvidia.com/v1"
+                    
+                    client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
+                    args = {"model": model, "messages": messages, "timeout": 20.0}
+                    if json_mode: args["response_format"] = {"type": "json_object"}
+                    
+                    res = await client.chat.completions.create(**args)
+                    return json.loads(res.choices[0].message.content) if json_mode else res.choices[0].message.content
+                
+                if provider == "anthropic":
+                    client = anthropic.AsyncAnthropic(api_key=api_key)
+                    sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "Expert Advisor")
+                    filtered = [m for m in messages if m["role"] != "system"]
+                    res = await client.messages.create(model=model, system=sys_msg, messages=filtered, max_tokens=2048)
+                    return json.loads(res.content[0].text) if json_mode else res.content[0].text
+                    
+            except Exception as e:
+                log_system(f"Attempt {attempt+1} failed for {provider}: {e}")
+                await asyncio.sleep(2)
+        
+        log_system(f"❌ {provider} exhausted. Falling back in the mesh...")
+    
+    return {"error": "CRITICAL: Sovereign mesh failed. All providers exhausted."}
 
 # ── App Init ─────────────────────────────────────────────────────────
 DEFAULT_SETTINGS = {
