@@ -1,6 +1,9 @@
 # 🚀 FinIntel Pro: Sovereign Market Intelligence Engine
 
-**FinIntel Pro** is a production-grade, self-hosted financial intelligence command center designed for experienced traders in the Indian market (NSE/BSE). It synthesizes real-time market data, institutional "Big Bull" sentiment, and global world events into actionable, high-conviction research.
+**FinIntel Pro** is a production-grade, **Native Windows** self-hosted financial intelligence command center. Designed for experienced traders in the Indian market (NSE/BSE) and global crypto ecosystems, it synthesizes real-time market data, institutional "Big Bull" sentiment, and global world events into actionable, high-conviction research.
+
+> [!IMPORTANT]
+> **NATIVE WINDOWS ARCHITECTURE:** This software is optimized for Windows 10/11 environments. Background sentinels and desktop notifications are integrated directly into the Windows Notification Center.
 
 ![Sovereign Build 100%](https://img.shields.io/badge/Build-100%25_Compliant-cyan?style=for-the-badge)
 ![Market-NSE-BSE](https://img.shields.io/badge/Market-India_NSE%2FBSE-emerald?style=for-the-badge)
@@ -40,11 +43,13 @@ The system follows a **Local-First Sovereign Architecture**:
 
 ## 🛡️ Key Features & Capabilities
 
-### 1. Autonomous Titan Sentinel
+### 1. Autonomous "Titan Sentinel" (Global & Domestic)
 A background kernel that scans the world 24/7 every 15 minutes. It tracks:
-- **Big Bulls:** Vijay Kedia, Ashish Kacholia, Mukul Agrawal.
-- **Institutions:** Rare Enterprises, SEBI circulars, and RBI policies.
-- **Triggers:** Automatically starts "Deep Research" if a critical event is detected.
+- **Indian Market Titans:** Vijay Kedia, Ashish Kacholia, Mukul Agrawal, and the Rare Enterprises (Jhunjhunwala) legacy.
+- **Global Crypto Bulls:** Michael Saylor (MicroStrategy), Cathie Wood (Ark), and Mark Cuban.
+- **CEO Intelligence:** Statements and social posts from Elon Musk, Jensen Huang, and Vitalik Buterin for "upcoming launch" detection.
+- **Regulatory Shifts:** Live monitoring of SEBI circulars and RBI policy changes.
+- **Predictive Alerts:** Aims to notify the user of potential announcements (e.g., Elon's May 1st statements) before they hit mainstream headlines.
 
 ### 2. Strategic Research Engine
 Synthesis across three credibility tiers:
@@ -100,10 +105,15 @@ finintel-pro/
 - One LLM API Key (OpenAI, Anthropic, or Groq)
 
 ### 2. Automated Install
-Run the following in a PowerShell terminal as Administrator:
-```powershell
-.\install.ps1
-```
+1. **Open a Terminal** (PowerShell or Command Prompt).
+2. **CD into the Root Directory:** You MUST be in the `finintel-pro` root folder.
+   ```bash
+   cd E:\finintel-pro
+   ```
+3. **Execute the Installer** (Administrator Mode recommended for PATH setup):
+   ```powershell
+   .\install.ps1
+   ```
 
 ### 3. Global Command
 Once installed, you can launch the engine from any directory:

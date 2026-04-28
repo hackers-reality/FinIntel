@@ -56,6 +56,17 @@ def decrypt_val(val: str) -> str:
     try: return FERNET.decrypt(val.encode()).decode()
     except: return val
 
+def sanitize_data(obj):
+    """Sanitize data to handle NaN/Inf for JSON compliance"""
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj): return 0
+        return obj
+    if isinstance(obj, dict):
+        return {k: sanitize_data(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [sanitize_data(x) for x in obj]
+    return obj
+
 # ── Database Engine ──────────────────────────────────────────────────
 @contextmanager
 def db_session():
@@ -126,9 +137,6 @@ async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False):
         return {"error": str(e)}
 
 # ── App Init ─────────────────────────────────────────────────────────
-app = FastAPI(title="FinIntel Pro Production API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
 DEFAULT_SETTINGS = {
     "llm_provider": "openai",
     "llm_model": "gpt-4o",
@@ -145,6 +153,22 @@ def load_settings():
     with open(SETTINGS_PATH, "r") as f: return json.load(f)
 
 settings = load_settings()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    scheduler.add_job(check_market_events, 'interval', minutes=5)
+    scheduler.add_job(autonomous_sentinel_news, 'interval', minutes=15)
+    scheduler.start()
+    init_db()
+    log_system("KERNEL ONLINE: SENTINEL ACTIVE")
+    yield
+    # Shutdown
+    scheduler.shutdown()
+    log_system("KERNEL OFFLINE")
+
+app = FastAPI(title="FinIntel Sovereign Kernel", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Background Sentinel Monitor (MEGA PROJECT UPGRADE) ────────────────
 def check_market_events():
@@ -194,16 +218,16 @@ async def autonomous_sentinel_news():
     log_system("Sentinel Scanning Indian Titans & Global Events...")
     try:
         with DDGS() as ddgs:
-            # Targeted Indian Market Titan Queries
+            # Targeted Intelligence Queries
             queries = [
-                "Vijay Kedia Ashish Kacholia latest portfolio changes 2024",
-                "Mukul Agrawal new stock picks NSE BSE",
-                "Rare Enterprises Jhunjhunwala legacy latest news",
-                "SEBI circulars today market impact",
-                "RBI policy sentiment stock market today",
-                "top 10 Indian investors latest blog posts LinkedIn",
-                "breaking news NSE BSE huge volume spike discovery",
-                "Elon Musk crypto financial announcement today"
+                "Elon Musk Twitter official company announcement",
+                "Michael Saylor Bitcoin MicroStrategy institutional purchase",
+                "Cathie Wood Ark Invest latest stock trade",
+                "Jensen Huang NVIDIA CEO news",
+                "Vijay Kedia Ashish Kacholia portfolio changes",
+                "breaking crypto news upcoming market catalysts",
+                "SEBI circulars market impact today",
+                "insider news upcoming tech IPO India"
             ]
             raw_news = []
             for q in queries:
@@ -211,20 +235,20 @@ async def autonomous_sentinel_news():
             
             snippets = [f"{r.get('title')}: {r.get('body')}" for r in raw_news]
             prompt = f"""
-            Analyze these headlines for CRITICAL Indian Market movements or Titan activity. 
-            Titan List to Watch: Vijay Kedia, Ashish Kacholia, Mukul Agrawal, Rare Enterprises, SEBI, RBI.
+            Analyze these headlines for PREDICTIVE market-moving events. 
+            Watchlist: Elon Musk, Michael Saylor, Cathie Wood, Jensen Huang, Vijay Kedia.
             
-            Identify if any 'Big Bulls' are moving into new stocks or if regulatory shifts are occurring.
-            Synthesize all info (news, blogs, posts) into a strategic research result.
+            Find mentions of: Upcoming launches, new currencies, secret statements, or hidden institutional moves.
+            If something huge is about to happen (e.g. Elon May 1st), return 'critical': true.
             Return JSON: 
             {{ 
               'critical': true/false, 
-              'event': 'Short Title (e.g. Titan Entry: [Ticker])', 
-              'summary': 'Deeply synthesized result - why is this important and what is the trade?', 
-              'tickers': [NSE/BSE tickers found],
+              'event': 'Prediction: [Event Name]', 
+              'summary': 'Synthesized leak/info - what is coming and when?', 
+              'tickers': [tickers affected],
               'source_consensus': 'High/Medium/Low' 
             }}
-            News: {' '.join(snippets[:15])}
+            News: {' '.join(snippets[:20])}
             """
             
             res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
@@ -249,19 +273,7 @@ async def autonomous_sentinel_news():
     except Exception as e:
         log_system(f"Sentinel News Error: {e}")
 
-def run_sentinel_loop():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(autonomous_sentinel_news())
-
 scheduler = BackgroundScheduler()
-scheduler.add_job(check_market_events, 'interval', minutes=5)
-scheduler.add_job(run_sentinel_loop, 'interval', minutes=15) # Scan news every 15 mins
-scheduler.start()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    scheduler.shutdown()
 
 # ── Endpoints ────────────────────────────────────────────────────────
 @app.get("/health")
@@ -314,28 +326,12 @@ async def compare_assets(t1: str, t2: str):
 
 @app.get("/market/overview")
 async def get_overview():
-    cached = CACHE.get("overview")
-    if cached: return cached
-    results = {}
-    assets = {"Stocks": ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "SBI.NS", "BHARTIARTL.NS", "ADANIENT.NS"], "Indices": ["^NSEI", "^BSESN"]}
-    for cat, syms in assets.items():
-        cat_data = []
-        for sym in syms:
-            try:
-                t = yf.Ticker(sym)
-                h = await asyncio.to_thread(t.history, period="2d")
-                if h.empty: continue
-                price = h['Close'].iloc[-1]
-                change = ((price - h['Close'].iloc[-2]) / h['Close'].iloc[-2]) * 100
-                sector = "Index"
-                if cat == "Stocks":
-                    info = await asyncio.to_thread(lambda: t.info)
-                    sector = info.get("sector", "Other")
-                cat_data.append({"ticker": sym.replace(".NS",""), "price": round(price, 2), "change": round(change, 2), "sector": sector})
-            except: continue
-        results[cat] = cat_data
-    CACHE.set("overview", results)
-    return results
+    try:
+        data = await SmartCache.get_overview()
+        return sanitize_data(data)
+    except Exception as e:
+        log_system(f"Overview Error: {e}")
+        return {"error": str(e)}
 
 @app.get("/market/sectors")
 async def get_sectors():
@@ -367,18 +363,10 @@ async def get_price_alerts():
     return [{"id": r[0], "ticker": r[1], "target": r[2], "condition": r[3], "active": r[4]} for r in rows]
 
 @app.get("/market/chart/{ticker}")
-async def get_chart(ticker: str, interval: str = "1h"):
-    cache_key = f"chart_{ticker}_{interval}"
-    cached = CACHE.get(cache_key)
-    if cached: return cached
-    periods = {"1m":"1d","5m":"1d","15m":"5d","1h":"1mo","1d":"1y","1wk":"2y","1mo":"max"}
-    sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
+async def get_chart(ticker: str):
     try:
-        t = yf.Ticker(sym)
-        h = await asyncio.to_thread(t.history, period=periods.get(interval, "1mo"), interval=interval)
-        data = [{"time": int(i.timestamp()), "close": round(r['Close'], 2)} for i, r in h.iterrows()]
-        CACHE.set(cache_key, data)
-        return data
+        data = await SmartCache.get_chart(ticker)
+        return sanitize_data(data)
     except Exception as e: return {"error": str(e)}
 
 @app.get("/market/research/{ticker}")
