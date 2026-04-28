@@ -111,9 +111,6 @@ async def call_llm(messages, json_mode=False):
 
 # ── Market Data Synthesis ────────────────────────────────────────────
 async def get_market_overview_internal():
-    # Priority: Zerodha -> yfinance
-    kite = get_kite_client()
-    # Required: Nifty 50, Sensex, India VIX, USD/INR, + Favorites
     base_tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "USDINR=X"]
     results = []
     for t in base_tickers:
@@ -123,47 +120,33 @@ async def get_market_overview_internal():
                 cur, op = h['Close'].iloc[-1], h['Open'].iloc[0]
                 results.append({"symbol": t, "price": cur, "change": ((cur-op)/op)*100})
         except: pass
-        
     sectors = []
-    for s, idx in {"Bank": "^CNXBANK", "IT": "^CNXIT", "Auto": "^CNXAUTO", "Pharma": "^CNXPHARMA"}.items():
+    for s, idx in {"Bank": "^CNXBANK", "IT": "^CNXIT", "Auto": "^CNXAUTO"}.items():
         try:
             h = yf.Ticker(idx).history(period="1d")
-            if not h.empty:
-                cur, op = h['Close'].iloc[-1], h['Open'].iloc[0]
-                sectors.append({"name": s, "sentiment": round(((cur-op)/op)*100, 2)})
+            if not h.empty: sectors.append({"name": s, "sentiment": round(((h['Close'].iloc[-1]-h['Open'].iloc[0])/h['Open'].iloc[0])*100, 2)})
         except: pass
-        
     return {"Stocks": results, "categories": sectors, "market_status": "OPEN" if is_market_open() else "CLOSED"}
 
-# ── Synchronous Sentinel Thread ──────────────────────────────────────
+# ── Sentinel Thread ──────────────────────────────────────────────────
 def sentinel_sync_loop():
     while True:
         try:
             now = datetime.now(IST)
-            log_system(f"Sentinel Active: {now.isoformat()}")
-            
-            # 1. Market Hours Alert (VIX above 20)
             if is_market_open():
                 vix = yf.Ticker("^INDIAVIX").history(period="1d")
                 if not vix.empty and vix['Close'].iloc[-1] > 20:
                     with db_session() as c:
-                        c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "HIGH VOLATILITY SPIKE (>20). REDUCE EXPOSURE.", now.isoformat()))
-            
-            # 2. Daily FII/DII Scrape at 6 PM IST
+                        c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "VOLATILITY SPIKE ALERT", now.isoformat()))
             if now.hour == 18 and now.minute <= 15:
-                # Fallback to DDGS if direct NSE fails
                 with DDGS() as ddgs:
-                    fii_data = list(ddgs.text("FII DII net data today NSE", max_results=1))
-                    if fii_data:
+                    fii = list(ddgs.text("FII DII data today NSE", max_results=1))
+                    if fii:
                         with db_session() as c:
-                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("MARKET", "FII_DII", fii_data[0]['body'][:200], now.isoformat()))
-            
-            time.sleep(900) # 15 Minute Cycle
-        except Exception as e:
-            log_system(f"Sentinel Loop Fault: {str(e)}", "ERROR")
-            time.sleep(60)
+                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("MARKET", "FII_DII", fii[0]['body'][:200], now.isoformat()))
+            time.sleep(900)
+        except: time.sleep(60)
 
-# ── App Lifespan ─────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -176,38 +159,58 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allo
 @app.get("/market/overview")
 async def market_overview(): return await get_market_overview_internal()
 
-@app.get("/market/research/{ticker}")
-@limiter.limit("10/hour")
-async def deep_research(ticker: str, request: Request):
-    t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
-    info = t.info
-    with DDGS() as ddgs: news = str(list(ddgs.text(f"{ticker} stock latest news filings", max_results=5)))
-    
-    prompt = [{"role": "system", "content": "You are a professional equity researcher. Analyze the stock using the data. Return JSON with EXACT keys: Score, Verdict, Summary, Investment_Rationale, Strategy, Risks, Target_Price, Moat_Score."},
-              {"role": "user", "content": f"Data: {info}. News: {news}"}]
-    res = await call_llm(prompt, json_mode=True)
-    return json.loads(res)
+@app.get("/market/events/{ticker}")
+async def get_events(ticker: str):
+    with db_session() as c:
+        c.execute("SELECT id, ticker, type, description, resolution_date, status FROM pending_events WHERE ticker=? AND status='pending'", (ticker,))
+        return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "resolution_date": r[4], "status": r[5]} for r in c.fetchall()]
 
-@app.get("/market/zerodha/holdings")
-async def zerodha_holdings():
-    k = get_kite_client()
-    return k.holdings() if k else []
+@app.post("/market/events")
+async def create_event(data: Dict):
+    with db_session() as c:
+        c.execute("INSERT INTO pending_events (ticker, type, description, resolution_date, status) VALUES (?, ?, ?, ?, 'pending')",
+                  (data['ticker'], data['event_type'], data['description'], data['expected_resolution_date']))
+    return {"status": "success"}
 
-@app.post("/analyze/document")
-async def analyze_document(data: Dict):
-    prompt = [{"role": "system", "content": "Analyze document for fine print. Return JSON: risk_clauses, court_case_mentions, regulatory_flags, sentiment_verdict."},
-              {"role": "user", "content": data.get("text", "")}]
-    res = await call_llm(prompt, json_mode=True)
-    return json.loads(res)
+@app.patch("/market/events/{event_id}")
+async def resolve_event(event_id: int):
+    with db_session() as c:
+        c.execute("UPDATE pending_events SET status='resolved' WHERE id=?", (event_id,))
+    return {"status": "success"}
 
-@app.get("/market/behavior/{ticker}")
-async def get_behavior(ticker: str):
-    h = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS").history(period="20d")
-    if h.empty: return {"status": "NEUTRAL"}
-    vol_avg = h['Volume'].mean()
-    vol_now = h['Volume'].iloc[-1]
-    score = vol_now / vol_avg
-    return {"score": round(score, 2), "status": "ACCUMULATION" if score > 1.5 and h['Close'].iloc[-1] > h['Open'].iloc[-1] else "NEUTRAL"}
+@app.get("/market/fiidii")
+async def get_fiidii():
+    with db_session() as c:
+        c.execute("SELECT date, fii_net, dii_net FROM fii_dii_flow ORDER BY date DESC LIMIT 5")
+        return [{"date": r[0], "fii_net": r[1], "dii_net": r[2]} for r in c.fetchall()]
+
+@app.get("/market/portfolio/summary")
+async def portfolio_summary():
+    with db_session() as c:
+        c.execute("SELECT ticker, qty, price FROM portfolio")
+        rows = c.fetchall()
+    total_value = 0
+    holdings = []
+    for r in rows:
+        ticker, qty, avg_price = r[0], r[1], r[2]
+        try:
+            h = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS").history(period="1d")
+            cur = h['Close'].iloc[-1] if not h.empty else avg_price
+        except: cur = avg_price
+        total_value += (cur * qty)
+        holdings.append({"ticker": ticker, "qty": qty, "avg_price": avg_price, "current_price": round(cur, 2), "pnl": round((cur - avg_price) * qty, 2)})
+    return {"total_value": round(total_value, 2), "holdings": holdings}
+
+@app.get("/market/traders/news")
+async def whale_watch():
+    year = datetime.now().year
+    titans = ["Vijay Kedia", "Ashish Kacholia", "Mukul Agrawal"]
+    results = []
+    with DDGS() as ddgs:
+        for t in titans:
+            news = list(ddgs.text(f"'{t}' stock latest buy {year}", max_results=2))
+            for n in news: results.append({"trader": t, "title": n.get('title'), "url": n.get('href')})
+    return results
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
