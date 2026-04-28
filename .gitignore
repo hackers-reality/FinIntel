@@ -9,6 +9,9 @@ venv/
 *.log
 *.sqlite
 database.db
+finintel.db
+chat_history.json
+secret.key
 
 # Node
 node_modules/
@@ -23,7 +26,6 @@ dist-ssr/
 *.swo
 
 # Project Specific
-secret.key
 system.log
 backend/system.log
 backend/__pycache__/
