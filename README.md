@@ -1,19 +1,33 @@
-# FinIntel Pro: Sovereign Intelligence Engine (v2.0)
+# FinIntel Pro: Sovereign Intelligence Engine (v2.1)
+### *Gold Master: Institutional Grade Strategic Command*
 
-A high-fidelity, local-first financial command center for Indian retail traders.
+FinIntel Pro is a high-fidelity, private financial command center engineered for the sophisticated Indian retail trader. It synthesizes real-time institutional data, legal forensic analysis, and behavioral patterns into a zero-distraction "Bloomberg-Flat" interface.
 
-## Features
-- **Zerodha Integration:** Live holdings, positions, and institutional feeds via KiteConnect.
-- **Document Forensic Center:** LLM-powered scanning of legal filings and regulatory "fine print."
-- **Strategic Duel Engine:** Parallel research comparison mode for rapid asset arbitration.
-- **Institutional Sentinel:** FII/DII flow tracking, India VIX alerts, and Whale Trade monitoring.
-- **Sovereign Context:** AI Advisor with memory of your portfolio and research history.
+## 🏛️ System Architecture
 
-## Quick Start
-1. Clone the repository.
-2. Run `install.ps1` (Windows) to set up dependencies and the global `finintel` command.
-3. Configure your `.env` with `ZERODHA_API_KEY`, `ZERODHA_ACCESS_TOKEN`, and `OPENAI_API_KEY`.
-4. Run `finintel` to launch the command center.
+### 1. Intelligence Kernel (Python/FastAPI)
+- **Zerodha Kite Pulse:** Lead-source integration for live holdings, positions, and capital exposure.
+- **Forensic Document Engine:** LLM-powered forensic scanning of regulatory filings to extract "fine print" risks and legal flags.
+- **Behavioral Analytics:** Real-time volume-anomaly detection (20-day MA) and price-action pattern identification (Accumulation/Distribution).
+- **Synchronous Sentinel:** A dedicated background loop for systemic VIX monitoring and FII/DII institutional flow scraping.
 
-## Terminal Aesthetics
-Press **'T'** in the dashboard to toggle between **Sovereign (Modern)** and **Terminal (Classic)** themes.
+### 2. Tactical Interface (React/Vite)
+- **Bloomberg-Flat Dashboard:** A strictly utilitarian, high-contrast grid optimized for data density and zero-animation distraction.
+- **Whale Watch Panel:** Real-time institutional activity synthesis (Vijay Kedia, Ashish Kacholia, etc.) via DDGS Strategic Mesh.
+- **Sovereign Dual Arena:** Parallel research arbitration mode for head-to-head asset comparison.
+- **Terminal Aesthetics:** Instant toggle (Hotkey: **'T'**) between Sovereign Modern and Monospace Terminal themes.
+
+## 🛠️ Tactical Deployment
+
+### Quick Start
+1. **Repository Initialization:** Clone the dossier to your local secure environment.
+2. **Environment Hardening:** Run `install.ps1` to configure global dependencies and the `finintel` command.
+3. **Strategic Keys:** Populate `.env` with `ZERODHA_API_KEY`, `ZERODHA_ACCESS_TOKEN`, and `OPENAI_API_KEY`.
+4. **Ignition:** Execute `finintel` to launch the Strategic Command Center.
+
+### IST Market Awareness
+The system strictly respects **09:15 - 15:30 IST** trading hours. Background scrapers for FII/DII data trigger daily at **6:00 PM IST**.
+
+---
+**Status: Sovereign & Invincible.**
+*Engineered for High-Conviction Alpha.*
