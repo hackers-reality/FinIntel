@@ -37,24 +37,36 @@ To fully ignite the Nexus, populate your `.env` file or the **Strategic Vault** 
 | **Broker** | `ZERODHA_API_SECRET`| **Mandatory** | Secure Session Generation |
 | **Intelligence**| `NVIDIA_API_KEY` | **Recommended**| Free Institutional Reasoning (Llama 405B) |
 | **Intelligence**| `OPENAI_API_KEY` | **Optional** | Primary Fallback for Reasoning |
-| **Intelligence**| `ANTHROPIC_API_KEY`| **Optional** | Forensic Document Analysis |
-| **Intelligence**| `GEMINI_API_KEY` | **Optional** | Multimodal Context Handling |
 
 ---
 
 ## ⚡ Zerodha Tactical Integration
 
-The Nexus supports two distinct authentication flows for your daily session:
+### Phase 1: Portal Deployment
+1. **Navigate to the Portal:** Open the [Kite Connect Developer Portal](https://kite.trade/).
+2. **Authentication:** Log in (or create a developer account).
+3. **App Creation:** 
+   - Click on the **"My Apps"** tab in the top navigation bar.
+   - Click the **"Create New App"** button (Top Right).
+   - **App Name:** `Sovereign Nexus`
+   - **Redirect URL:** `http://127.0.0.1` (Crucial: Must match exactly).
+   - **Postback URL:** Leave blank.
+   - **Description:** `Institutional Research Nexus`.
+4. **Key Extraction:** Once created, click on your app to find your **API Key** and **API Secret**.
 
-### Option A: Zero-Touch Auth (Recommended)
-1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface.
-2. **Inject Strategic Data:** Enter your Zerodha Client ID, Password, and TOTP Secret Key.
+---
+
+### Phase 2: Authentication Flows
+
+#### Option A: Zero-Touch Auth (Recommended)
+1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface (`http://localhost:5173/settings`).
+2. **Inject Strategic Data:** Enter your Zerodha **User ID**, **Password**, **TOTP Secret Key**, **API Key**, and **API Secret**.
 3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. The Nexus will handle the 2FA and session autonomously.
 
-### Option B: Manual Handshake (Fallback)
-1. **Developer Portal:** Set **Redirect URL** to `http://127.0.0.1` at [kite.trade](https://kite.trade/).
-2. **Login URL:** Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
-3. **Extract Token:** Copy the `request_token` from the URL bar of the redirected page (ignore the "site can't be reached" error).
+#### Option B: Manual Handshake (Fallback)
+1. **Login URL:** Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
+2. **Authorize:** Log in and approve the request.
+3. **Extract Token:** Copy the `request_token` from the URL bar of the redirected "broken" page.
 4. **Generate Session:**
    ```python
    from kiteconnect import KiteConnect
@@ -62,7 +74,6 @@ The Nexus supports two distinct authentication flows for your daily session:
    data = kite.generate_session("YOUR_TOKEN", api_secret="YOUR_SECRET")
    print(data["access_token"])
    ```
-5. **Inject:** Update `ZERODHA_ACCESS_TOKEN` in your `.env`.
 
 ---
 
@@ -70,9 +81,8 @@ The Nexus supports two distinct authentication flows for your daily session:
 
 The Nexus v2.4 utilizes a multi-mesh reasoning strategy, prioritizing free institutional-grade power:
 
-1. **NVIDIA NIM (Priority 1):** Utilizes `meta/llama-3.1-405b-instruct`. 
-2. **OpenAI (Priority 2):** Fallback to `gpt-4o` for structural redundancy.
-3. **Anthropic/Gemini:** Integrated for specialized forensic arbitration.
+1. **NVIDIA NIM (Priority 1):** Utilizes `meta/llama-3.1-405b-instruct` for free Alpha generation.
+2. **OpenAI (Priority 2):** Fallback for structural redundancy.
 
 ---
 
@@ -84,17 +94,6 @@ The Nexus v2.4 utilizes a multi-mesh reasoning strategy, prioritizing free insti
    .\install.ps1
    ```
 2. **Ignition:** Execute `.\finintel.ps1` or `python run.py`.
-
----
-
-## 📡 API Forensic Guide
-
-| Provider | Purpose | Data Depth |
-| :--- | :--- | :--- |
-| **KiteConnect** | Primary Brokerage | Live Holdings, PnL, Order Book |
-| **NVIDIA Mesh** | Alpha Reasoning | Strategic Synthesis & Verdicts |
-| **Elite Mesh** | Authority Data | Moneycontrol, Livemint, SEBI Filings |
-| **yfinance** | Market Pulse | Indices, VIX, Forex, Sentiment |
 
 ---
 **Status: Sovereign & Invincible.**
