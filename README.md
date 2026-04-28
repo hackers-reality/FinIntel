@@ -1,16 +1,43 @@
-# 🛡️ Sovereign Intelligence Nexus (v2.3)
+# 🛡️ Sovereign Intelligence Nexus (v2.4)
 ### *Strategic Command Center for Elite Indian Retail Traders*
 
-> **Status:** Gold Master Candidate | **Build:** v2.3 | **System:** Sovereign Intelligence Nexus
+> **Status:** Gold Master Candidate | **Build:** v2.4 | **System:** Sovereign Intelligence Nexus
 
 The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence engine engineered to provide retail traders with institutional-grade edge. It synthesizes real-time market pulse, forensic document analysis, and institutional whale-tracking into a strictly utilitarian, zero-distraction tactical environment.
+
+---
+
+## 🗺️ System Architecture (The Nexus Map)
+
+```mermaid
+graph TD
+    subgraph "External Intelligence Mesh"
+        A[Zerodha KiteConnect] -->|Live Holdings/Positions| E[Intelligence Kernel]
+        B[yfinance] -->|Indices/VIX/Forex| E
+        C[Elite Domain Mesh] -->|High-Authority Research| E
+        D[OpenAI GPT-4o] -->|Forensic Analysis/Verdict| E
+    end
+
+    subgraph "Intelligence Kernel (Python/FastAPI)"
+        E -->|WebSocket Pulse| F[Tactical Interface]
+        E -->|SQLite Sync| G[(Nexus DB)]
+        E -->|Sentinel Loop| H[Native Toast Alerts]
+        E -->|Autonomous Auth| I[Zero-Touch Kernel]
+    end
+
+    subgraph "Tactical Interface (React/Vite)"
+        F -->|Filing Forensics| J[Risk Analysis]
+        F -->|Strategic Vault| K[Secure Settings]
+        F -->|Cmd+K Palette| L[Action Nerve Center]
+    end
+```
 
 ---
 
 ## 📜 Table of Contents
 1. [Core Features](#-core-features)
 2. [Strategic Components](#-strategic-components)
-3. [Zerodha Tactical Integration](#-zerodha-tactical-integration)
+3. [Zero-Touch Zerodha Auth](#-zero-touch-zerodha-auth)
 4. [Tactical Installation](#-tactical-installation)
 5. [Docker Orchestration](#-docker-orchestration)
 6. [API Forensic Guide](#-api-forensic-guide)
@@ -20,6 +47,7 @@ The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence en
 
 ## 🛡️ Core Features
 - **Zerodha Kite Pulse:** Native tracking of live holdings and positions.
+- **Zero-Touch Auth:** Autonomous daily session synchronization using headless TOTP 2FA.
 - **Elite Domain Mesh:** Research queries weighted against high-authority finance domains.
 - **Forensic Filing Engine:** LLM-powered scanning of regulatory documents for "fine print" risks.
 - **Whale Trade Sentinel:** Automated tracking of institutional whale activity.
@@ -28,42 +56,15 @@ The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence en
 
 ---
 
-## 🔑 Zerodha Tactical Integration
+## 🔑 Zero-Touch Zerodha Auth
 
-To activate the live portfolio and institutional data stream, follow these steps:
+The Nexus v2.4 now features an autonomous authentication engine. To activate:
 
-### 1. Developer Account
-- Go to [Kite Connect Developer Portal](https://kite.trade/).
-- Create an account and log in.
-- **Create a New App:** Provide a name and set the **Redirect URL** to `http://127.0.0.1`. 
-  > [!IMPORTANT]
-  > Ensure this matches your Kite Dashboard *exactly*.
-- **Postback URL:** Leave this **BLANK**. 
-  > [!NOTE]
-  > The Postback URL is used for server-side order updates. Since the Nexus is a local-first research engine, this is not required and will not work without a public tunnel (ngrok).
-
-### 2. Manual Access Token Generation
-Zerodha requires a fresh `access_token` daily. Follow this flow to generate it:
-1.  **Login URL:** Open this in your browser:  
-    `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`
-2.  **Authorize:** Log in with your Zerodha credentials.
-3.  **Extract Request Token:** You will be redirected to `http://127.0.0.1/?request_token=XXXXX`. 
-    > [!WARNING]
-    > The browser will show **"This site can't be reached"**. This is **EXPECTED**. Look at the URL bar at the top of your browser; the `request_token` is right there. Copy it.
-4.  **Generate Access Token:** Use the following Python command to get your token:
-    ```python
-    from kiteconnect import KiteConnect
-    kite = KiteConnect(api_key="YOUR_API_KEY")
-    data = kite.generate_session("YOUR_REQUEST_TOKEN", api_secret="YOUR_API_SECRET")
-    print(data["access_token"])
-    ```
-
-### 3. Environment Injection
-Add the generated keys to your `.env` file:
-```env
-ZERODHA_API_KEY=your_api_key_here
-ZERODHA_ACCESS_TOKEN=your_access_token_here
-```
+1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface.
+2. **Inject Strategic Data:** Enter your Zerodha Client ID, Password, and TOTP Secret Key.
+3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. 
+   > [!TIP]
+   > The Nexus will autonomously perform the headless login, generate the TOTP, and synchronize your session key—no manual token generation required.
 
 ---
 
@@ -76,7 +77,7 @@ ZERODHA_ACCESS_TOKEN=your_access_token_here
    # Run the Nexus Installer
    .\install.ps1
    ```
-3. **Ignition:** Execute `.\finintel.ps1` in your terminal.
+3. **Ignition:** Execute `.\finintel.ps1` or `python run.py`.
 
 ---
 
