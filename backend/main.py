@@ -90,41 +90,37 @@ def db_session():
     try: yield conn.cursor()
     finally: conn.commit(); conn.close()
 
-# ── Intelligence Multi-Mesh (NVIDIA > Groq > Anthropic > OpenAI) ─────
+# ── Universal Intelligence Mesh ──────────────────────────────────────
 async def call_llm(messages, json_mode=False):
-    keys = {
-        "nv": os.getenv("NVIDIA_API_KEY"),
-        "gr": os.getenv("GROQ_API_KEY"),
-        "an": os.getenv("ANTHROPIC_API_KEY"),
-        "oa": os.getenv("OPENAI_API_KEY"),
-        "gm": os.getenv("GEMINI_API_KEY")
-    }
-    
-    # 1. NVIDIA NIM (Recommended: Free & Powerful)
-    if keys["nv"]:
-        try:
-            client = openai.AsyncOpenAI(api_key=keys["nv"], base_url="https://integrate.api.nvidia.com/v1")
-            resp = await client.chat.completions.create(model="meta/llama-3.1-405b-instruct", messages=messages, response_format={"type": "json_object"} if json_mode else None)
-            return resp.choices[0].message.content
-        except: pass
+    with db_session() as c:
+        c.execute("SELECT key, value FROM settings WHERE key IN ('active_provider', 'active_model')")
+        config = {r[0]: decrypt_v(r[1]) for r in c.fetchall()}
+        provider = config.get('active_provider', 'nvidia')
+        model = config.get('active_model', 'meta/llama-3.1-405b-instruct')
         
-    # 2. Groq (High Speed Llama 3)
-    if keys["gr"]:
-        try:
-            client = openai.AsyncOpenAI(api_key=keys["gr"], base_url="https://api.groq.com/openai/v1")
-            resp = await client.chat.completions.create(model="llama3-70b-8192", messages=messages, response_format={"type": "json_object"} if json_mode else None)
-            return resp.choices[0].message.content
-        except: pass
+        c.execute(f"SELECT value FROM settings WHERE key='{provider}_api_key'")
+        res = c.fetchone()
+        api_key = decrypt_v(res[0]) if res else os.getenv(f"{provider.upper()}_API_KEY")
 
-    # 3. OpenAI Fallback
-    if keys["oa"]:
-        try:
-            client = openai.AsyncOpenAI(api_key=keys["oa"])
-            resp = await client.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"} if json_mode else None)
-            return resp.choices[0].message.content
-        except: pass
+    if not api_key: return "{}"
+
+    try:
+        base_urls = {
+            "nvidia": "https://integrate.api.nvidia.com/v1",
+            "groq": "https://api.groq.com/openai/v1",
+            "openrouter": "https://openrouter.ai/api/v1",
+            "openai": "https://api.openai.com/v1"
+        }
         
-    return "{}"
+        client = openai.AsyncOpenAI(api_key=api_key, base_url=base_urls.get(provider))
+        resp = await client.chat.completions.create(
+            model=model, 
+            messages=messages, 
+            response_format={"type": "json_object"} if json_mode else None
+        )
+        return resp.choices[0].message.content
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # ── Zerodha Autonomous Auth ──────────────────────────────────────────
 @asynccontextmanager
@@ -136,12 +132,27 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
 
-@app.post("/settings/zerodha")
-async def save_zerodha_creds(data: Dict):
+@app.post("/settings/vault")
+async def vault_settings(data: Dict):
     with db_session() as c:
         for k, v in data.items():
             c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
-    return {"status": "credentials encrypted and saved"}
+    return {"status": "success"}
+
+@app.get("/settings/verify/{provider}")
+async def verify_key(provider: str, key: str):
+    try:
+        base_urls = {
+            "nvidia": "https://integrate.api.nvidia.com/v1",
+            "groq": "https://api.groq.com/openai/v1",
+            "openrouter": "https://openrouter.ai/api/v1",
+            "openai": "https://api.openai.com/v1"
+        }
+        client = openai.OpenAI(api_key=key, base_url=base_urls.get(provider))
+        client.models.list()
+        return {"status": "valid"}
+    except:
+        return {"status": "invalid"}
 
 @app.post("/market/zerodha/auth")
 async def autonomous_auth():
