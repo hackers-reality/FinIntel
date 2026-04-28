@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Search, History, Cpu, BarChart3, TrendingUp, TrendingDown, 
-  Zap, Clock, Activity, Wallet, FileText, AlertCircle, List, Terminal, Command, CheckCircle2
+  Zap, Clock, Activity, Wallet, FileText, AlertCircle, List, Terminal, Command, CheckCircle2, Settings as SettingsIcon, Key
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -21,6 +21,13 @@ export default function Dashboard() {
   const [filingAnalysis, setFilingAnalysis] = useState<any>(null);
   const [isResearching, setIsResearching] = useState(false);
   const [researchResult, setResearchResult] = useState<any>(null);
+
+  // Settings State
+  const [zCreds, setZCreds] = useState({
+    zerodha_user_id: '', zerodha_password: '', zerodha_totp_secret: '',
+    zerodha_api_key: '', zerodha_api_secret: ''
+  });
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useHotkeys('ctrl+k', (e) => { e.preventDefault(); setShowPalette(!showPalette); });
   useHotkeys('esc', () => setShowPalette(false));
@@ -47,12 +54,23 @@ export default function Dashboard() {
     return () => ws.close();
   }, []);
 
-  const runResearch = async () => {
-    setIsResearching(true);
+  const saveSettings = async () => {
+    await fetch('http://localhost:8008/settings/zerodha', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(zCreds)
+    });
+    alert("Vault Synchronized.");
+  };
+
+  const triggerAuth = async () => {
+    setIsSyncing(true);
     try {
-      const res = await fetch(`http://localhost:8008/market/research/${selectedTicker}`);
-      setResearchResult(await res.json());
-    } catch {} finally { setIsResearching(false); }
+      const res = await fetch('http://localhost:8008/market/zerodha/auth', { method: 'POST' });
+      if (res.ok) alert("Nexus Authenticated Successfully.");
+      else alert("Auth Failed. Check Credentials.");
+    } catch {
+      alert("Network Error during Auth.");
+    } finally { setIsSyncing(false); }
   };
 
   const analyzeFiling = async () => {
@@ -75,10 +93,11 @@ export default function Dashboard() {
                   <Command size={24} className="text-cyan-400" />
                   <input autoFocus placeholder="Search Nexus Commands..." value={paletteSearch} onChange={e => setPaletteSearch(e.target.value)} className="w-full bg-transparent border-none outline-none text-lg font-medium text-white placeholder-gray-600" />
                </div>
-               <div className="p-4 max-h-96 overflow-y-auto">
-                  {['overview', 'portfolio', 'research'].map(id => (
-                    <button key={id} onClick={() => { setActiveTab(id); setShowPalette(false); }} className="w-full p-4 flex items-center space-x-4 hover:bg-white/5 rounded-xl transition-colors group">
-                       <p className="text-sm font-black uppercase text-gray-400 group-hover:text-cyan-400">{id}</p>
+               <div className="p-4 max-h-96 overflow-y-auto text-xs font-black uppercase text-gray-500">
+                  {['overview', 'portfolio', 'research', 'settings'].map(id => (
+                    <button key={id} onClick={() => { setActiveTab(id); setShowPalette(false); }} className="w-full p-4 flex items-center justify-between hover:bg-white/5 rounded-xl transition-colors group">
+                       <span>{id}</span>
+                       <span className="text-[10px] text-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">Select Mode</span>
                     </button>
                   ))}
                </div>
@@ -93,7 +112,7 @@ export default function Dashboard() {
           <h1 className="text-lg font-black tracking-tighter uppercase italic">Sovereign Nexus</h1>
         </div>
         <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
-          {['overview', 'portfolio', 'research'].map(t => (
+          {['overview', 'portfolio', 'research', 'settings'].map(t => (
             <button key={t} onClick={() => setActiveTab(t)} className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all", activeTab === t ? "bg-white/10 text-white" : "text-gray-500")}>{t}</button>
           ))}
         </div>
@@ -111,30 +130,6 @@ export default function Dashboard() {
                      <p className={cn("text-[10px] font-black mt-1", s.change > 0 ? "text-emerald-400" : "text-rose-400")}>{s.change.toFixed(2)}%</p>
                   </div>
                 ))}
-              </div>
-              <div className="grid grid-cols-2 gap-8">
-                 <div className="p-8 bg-white/5 border border-white/10 rounded-[3rem] space-y-4">
-                    <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Whale Watch</h3>
-                    <div className="space-y-2">
-                       {whaleNews.map((w, i) => (
-                         <div key={i} className="p-3 bg-white/5 rounded-xl flex justify-between items-center text-[10px]">
-                            <span className="font-black text-cyan-400">{w.trader}</span>
-                            <span className="text-gray-400 truncate ml-4 flex-1">{w.title}</span>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
-                 <div className="p-8 bg-white/5 border border-white/10 rounded-[3rem] space-y-4">
-                    <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-widest">FII/DII Trends</h3>
-                    <div className="space-y-2">
-                       {fiidii.map((f, i) => (
-                         <div key={i} className="p-3 bg-white/5 rounded-xl flex justify-between items-center text-[10px]">
-                            <span className="font-black text-gray-500">{f.date}</span>
-                            <span className={f.fii_net > 0 ? "text-emerald-400" : "text-rose-400"}>FII: {f.fii_net} Cr</span>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
               </div>
            </div>
         )}
@@ -160,18 +155,28 @@ export default function Dashboard() {
            </div>
         )}
 
-        {activeTab === 'research' && (
-           <div className="space-y-12">
+        {activeTab === 'settings' && (
+           <div className="max-w-2xl mx-auto space-y-8">
               <div className="p-12 bg-white/5 border border-white/10 rounded-[4rem] space-y-8">
-                 <h2 className="text-2xl font-black tracking-tighter uppercase italic">Forensic Scan</h2>
-                 <textarea value={filingText} onChange={e => setFilingText(e.target.value)} placeholder="Paste filing text..." className="w-full h-48 bg-black/40 border border-white/10 rounded-3xl p-8 text-sm outline-none focus:border-cyan-400" />
-                 <button onClick={analyzeFiling} className="w-full py-6 bg-cyan-400 text-black font-black uppercase rounded-3xl shadow-xl shadow-cyan-400/20">Initiate Forensic Verdict</button>
-                 {filingAnalysis && (
-                    <div className="p-8 bg-white/5 rounded-3xl border border-white/5">
-                       <p className="text-[10px] font-black text-rose-400 uppercase">Verdict: {filingAnalysis.sentiment_verdict}</p>
-                       <p className="text-xs text-gray-400 mt-2">{filingAnalysis.risk_clauses?.join(', ')}</p>
-                    </div>
-                 )}
+                 <div className="flex items-center space-x-4">
+                    <Key className="text-cyan-400" size={24} />
+                    <h2 className="text-2xl font-black tracking-tighter uppercase italic">Strategic Vault</h2>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <input placeholder="Zerodha Client ID" value={zCreds.zerodha_user_id} onChange={e => setZCreds({...zCreds, zerodha_user_id: e.target.value})} className="bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-black uppercase outline-none focus:border-cyan-400" />
+                    <input type="password" placeholder="Password" value={zCreds.zerodha_password} onChange={e => setZCreds({...zCreds, zerodha_password: e.target.value})} className="bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-black uppercase outline-none focus:border-cyan-400" />
+                 </div>
+                 <input placeholder="TOTP Secret Key" value={zCreds.zerodha_totp_secret} onChange={e => setZCreds({...zCreds, zerodha_totp_secret: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-black uppercase outline-none focus:border-cyan-400" />
+                 <div className="grid grid-cols-2 gap-4">
+                    <input placeholder="API Key" value={zCreds.zerodha_api_key} onChange={e => setZCreds({...zCreds, zerodha_api_key: e.target.value})} className="bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-black uppercase outline-none focus:border-cyan-400" />
+                    <input type="password" placeholder="API Secret" value={zCreds.zerodha_api_secret} onChange={e => setZCreds({...zCreds, zerodha_api_secret: e.target.value})} className="bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-black uppercase outline-none focus:border-cyan-400" />
+                 </div>
+                 <div className="flex space-x-4 pt-4">
+                    <button onClick={saveSettings} className="flex-1 py-4 border border-white/10 hover:bg-white/5 rounded-2xl text-[10px] font-black uppercase transition-all">Vault Credentials</button>
+                    <button onClick={triggerAuth} disabled={isSyncing} className={cn("flex-1 py-4 bg-cyan-400 text-black rounded-2xl text-[10px] font-black uppercase transition-all shadow-xl shadow-cyan-400/20", isSyncing && "opacity-50 cursor-not-allowed")}>
+                       {isSyncing ? "Syncing Mesh..." : "Ignite Nexus Sync"}
+                    </button>
+                 </div>
               </div>
            </div>
         )}

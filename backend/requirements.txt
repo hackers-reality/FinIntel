@@ -11,3 +11,4 @@ winotify
 slowapi
 python-dotenv
 fpdf
+pyotp

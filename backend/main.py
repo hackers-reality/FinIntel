@@ -25,6 +25,8 @@ from kiteconnect import KiteConnect
 import threading
 import time
 from fpdf import FPDF
+import pyotp
+from urllib.parse import urlparse, parse_qs
 
 # ── Elite Domain Mesh ────────────────────────────────────────────────
 ELITE_DOMAINS = [
@@ -50,20 +52,8 @@ def send_toast(title, msg):
 # ── Structured Logging ───────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("NexusKernel")
-class JSONFormatter(logging.Formatter):
-    def format(self, record):
-        return json.dumps({"timestamp": datetime.now().isoformat(), "level": record.levelname, "message": record.getMessage()})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-fh = logging.FileHandler(os.path.join(BASE_DIR, "system.log"))
-fh.setFormatter(JSONFormatter())
-logger.addHandler(fh)
-
-def log_system(msg, level="INFO"):
-    if level == "ERROR": logger.error(msg)
-    else: logger.info(msg)
-
-# ── Setup ────────────────────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.dirname(BASE_DIR), "finintel.db")
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
 IST = pytz.timezone('Asia/Kolkata')
@@ -100,57 +90,7 @@ def db_session():
     try: yield conn.cursor()
     finally: conn.commit(); conn.close()
 
-# ── Market Clock ──────────────────────────────────────────────────────
-def is_market_open():
-    now = datetime.now(IST)
-    if now.weekday() >= 5: return False
-    return dtime(9, 15) <= now.time() <= dtime(15, 30)
-
-# ── Zerodha Kite Integration ─────────────────────────────────────────
-def get_kite_client():
-    api_key = decrypt_v(os.getenv("ZERODHA_API_KEY"))
-    access_token = decrypt_v(os.getenv("ZERODHA_ACCESS_TOKEN"))
-    if not api_key or not access_token: return None
-    try:
-        kite = KiteConnect(api_key=api_key)
-        kite.set_access_token(access_token)
-        return kite
-    except: return None
-
-# ── Intelligence Engine ──────────────────────────────────────────────
-async def call_llm(messages, json_mode=False):
-    with db_session() as c:
-        c.execute("SELECT value FROM settings WHERE key='openai_api_key'")
-        res = c.fetchone()
-        api_key = decrypt_v(res[0]) if res else os.getenv("OPENAI_API_KEY")
-    if not api_key: return "{}"
-    try:
-        client = openai.AsyncOpenAI(api_key=api_key)
-        resp = await client.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"} if json_mode else None)
-        return resp.choices[0].message.content
-    except Exception as e: return f"Error: {str(e)}"
-
-# ── Sentinel Sync Loop ───────────────────────────────────────────────
-def sentinel_sync_loop():
-    while True:
-        try:
-            now = datetime.now(IST)
-            if is_market_open():
-                vix = yf.Ticker("^INDIAVIX").history(period="1d")
-                if not vix.empty and vix['Close'].iloc[-1] > 20:
-                    send_toast("⚠️ VOLATILITY SPIKE", f"India VIX is at {round(vix['Close'].iloc[-1], 2)}. Reduce positions.")
-                    with db_session() as c:
-                        c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "VOLATILITY SPIKE", now.isoformat()))
-            if now.hour == 18 and now.minute <= 15:
-                with DDGS() as ddgs:
-                    news = list(ddgs.text("NSE India FII DII flow today net", max_results=1))
-                    if news:
-                        send_toast("📡 INSTITUTIONAL FLOW", "New FII/DII data available.")
-                        with db_session() as c:
-                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("MARKET", "FII_DII", news[0]['body'][:200], now.isoformat()))
-            time.sleep(900)
-        except: time.sleep(60)
-
+# ── Zerodha Autonomous Auth ──────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -159,6 +99,87 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
+
+@app.post("/settings/zerodha")
+async def save_zerodha_creds(data: Dict):
+    with db_session() as c:
+        for k, v in data.items():
+            c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
+    return {"status": "credentials encrypted and saved"}
+
+@app.post("/market/zerodha/auth")
+async def autonomous_auth():
+    with db_session() as c:
+        c.execute("SELECT key, value FROM settings WHERE key LIKE 'zerodha_%'")
+        creds = {r[0]: decrypt_v(r[1]) for r in c.fetchall()}
+    
+    if not all(k in creds for k in ["zerodha_api_key", "zerodha_api_secret", "zerodha_user_id", "zerodha_password", "zerodha_totp_secret"]):
+        raise HTTPException(status_code=400, detail="Incomplete credentials in vault")
+
+    try:
+        session = requests.Session()
+        # 1. Start Login
+        login_url = f"https://kite.zerodha.com/connect/login?v=3&api_key={creds['zerodha_api_key']}"
+        res = session.get(login_url)
+        
+        # 2. Submit ID/Password
+        res = session.post("https://kite.zerodha.com/api/login", data={
+            "user_id": creds['zerodha_user_id'],
+            "password": creds['zerodha_password']
+        })
+        login_data = res.json()
+        request_id = login_data['data']['request_id']
+        
+        # 3. Submit TOTP
+        totp = pyotp.TOTP(creds['zerodha_totp_secret']).now()
+        res = session.post("https://kite.zerodha.com/api/twofa", data={
+            "user_id": creds['zerodha_user_id'],
+            "request_id": request_id,
+            "twofa_value": totp,
+            "twofa_type": "totp"
+        })
+        
+        # 4. Extract Request Token from Redirect
+        # This part simulates the browser redirect back to our redirect URL
+        final_url = session.get(login_url).url
+        parsed = urlparse(final_url)
+        request_token = parse_qs(parsed.query).get('request_token', [None])[0]
+        
+        if not request_token: raise Exception("Failed to capture request_token")
+        
+        # 5. Generate Session
+        kite = KiteConnect(api_key=creds['zerodha_api_key'])
+        data = kite.generate_session(request_token, api_secret=creds['zerodha_api_secret'])
+        access_token = data["access_token"]
+        
+        with db_session() as c:
+            c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ("zerodha_access_token", encrypt_v(access_token)))
+        
+        send_toast("🛡️ NEXUS AUTHENTICATED", "Zerodha session synchronized successfully.")
+        return {"status": "success", "access_token": "vaulted"}
+        
+    except Exception as e:
+        log_system(f"Auth Failure: {str(e)}", "ERROR")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Market Clock & Core Endpoints ─────────────────────────────────────
+def is_market_open():
+    now = datetime.now(IST)
+    if now.weekday() >= 5: return False
+    return dtime(9, 15) <= now.time() <= dtime(15, 30)
+
+def get_kite_client():
+    with db_session() as c:
+        c.execute("SELECT key, value FROM settings WHERE key IN ('zerodha_api_key', 'zerodha_access_token')")
+        creds = {r[0]: decrypt_v(r[1]) for r in c.fetchall()}
+    api_key = creds.get("zerodha_api_key") or os.getenv("ZERODHA_API_KEY")
+    access_token = creds.get("zerodha_access_token") or os.getenv("ZERODHA_ACCESS_TOKEN")
+    if not api_key or not access_token: return None
+    try:
+        kite = KiteConnect(api_key=api_key)
+        kite.set_access_token(access_token)
+        return kite
+    except: return None
 
 @app.get("/market/overview")
 async def market_overview():
@@ -186,19 +207,6 @@ async def get_events(ticker: str):
         rows = c.fetchall()
         return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "resolution_date": r[4], "status": r[5]} for r in rows]
 
-@app.post("/market/events")
-async def create_event(data: Dict):
-    with db_session() as c:
-        c.execute("INSERT INTO pending_events (ticker, type, description, resolution_date, status) VALUES (?, ?, ?, ?, 'pending')",
-                  (data['ticker'], data['event_type'], data['description'], data['expected_resolution_date']))
-    return {"status": "success"}
-
-@app.patch("/market/events/{event_id}")
-async def resolve_event(event_id: int):
-    with db_session() as c:
-        c.execute("UPDATE pending_events SET status='resolved' WHERE id=?", (event_id,))
-    return {"status": "success"}
-
 @app.get("/market/fiidii")
 async def get_fiidii():
     with db_session() as c:
@@ -206,16 +214,16 @@ async def get_fiidii():
         rows = c.fetchall()
         return [{"date": r[1], "fii_net": r[2], "dii_net": r[3]} for r in rows]
 
-@app.post("/market/portfolio/holdings")
-async def update_portfolio(data: List[Dict]):
-    with db_session() as c:
-        c.execute("DELETE FROM portfolio") 
-        for item in data:
-            c.execute("INSERT INTO portfolio (ticker, qty, price) VALUES (?, ?, ?)", (item['ticker'], item['qty'], item['price']))
-    return {"status": "portfolio updated"}
-
 @app.get("/market/portfolio/summary")
 async def portfolio_summary():
+    kite = get_kite_client()
+    if kite:
+        try:
+            holdings = kite.holdings()
+            total_value = sum(h['quantity'] * h['last_price'] for h in holdings)
+            return {"total_value": round(total_value, 2), "holdings": [{"ticker": h['tradingsymbol'], "qty": h['quantity'], "avg_price": h['average_price'], "current_price": h['last_price'], "pnl": h['pnl']} for h in holdings]}
+        except: pass
+    
     with db_session() as c:
         c.execute("SELECT ticker, qty, price FROM portfolio")
         rows = c.fetchall()
@@ -266,6 +274,38 @@ async def deep_research(ticker: str, request: Request):
               {"role": "user", "content": f"Ticker: {ticker}. Data: {info}. News Mesh: {news}"}]
     res = await call_llm(prompt, json_mode=True)
     return json.loads(res)
+
+def sentinel_sync_loop():
+    while True:
+        try:
+            now = datetime.now(IST)
+            if is_market_open():
+                vix = yf.Ticker("^INDIAVIX").history(period="1d")
+                if not vix.empty and vix['Close'].iloc[-1] > 20:
+                    send_toast("⚠️ VOLATILITY SPIKE", f"India VIX is at {round(vix['Close'].iloc[-1], 2)}. Reduce positions.")
+                    with db_session() as c:
+                        c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "VOLATILITY SPIKE", now.isoformat()))
+            if now.hour == 18 and now.minute <= 15:
+                with DDGS() as ddgs:
+                    news = list(ddgs.text("NSE India FII DII flow today net", max_results=1))
+                    if news:
+                        send_toast("📡 INSTITUTIONAL FLOW", "New FII/DII data available.")
+                        with db_session() as c:
+                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("MARKET", "FII_DII", news[0]['body'][:200], now.isoformat()))
+            time.sleep(900)
+        except: time.sleep(60)
+
+async def call_llm(messages, json_mode=False):
+    with db_session() as c:
+        c.execute("SELECT value FROM settings WHERE key='openai_api_key'")
+        res = c.fetchone()
+        api_key = decrypt_v(res[0]) if res else os.getenv("OPENAI_API_KEY")
+    if not api_key: return "{}"
+    try:
+        client = openai.AsyncOpenAI(api_key=api_key)
+        resp = await client.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"} if json_mode else None)
+        return resp.choices[0].message.content
+    except Exception as e: return f"Error: {str(e)}"
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
