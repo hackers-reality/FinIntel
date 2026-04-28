@@ -7,7 +7,15 @@ pip install fastapi uvicorn yfinance duckduckgo-search python-dotenv openai anth
 
 # 2. Install Node deps
 Write-Host "Setting up React frontend..." -ForegroundColor Yellow
+if (Test-Path "node_modules") {
+    Write-Host "Cleaning up old node_modules..." -ForegroundColor Gray
+    Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+}
+if (Test-Path "package-lock.json") {
+    Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+}
 npm install
+npm install lucide-react@latest
 
 # 3. Add to User PATH for global access
 $CurrentDir = Get-Location

@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables
+.env
+.env.local
+
+# Local execution scripts
+finintel
+finintel.cmd
+finintel-pro@0.0.0
+*.db
+*.log

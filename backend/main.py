@@ -172,7 +172,7 @@ async def market_monitor():
                     if sym == "NIFTY 50": sym = "^NSEI"
                     elif sym == "SENSEX": sym = "^BSESN"
                     
-                    t = yf.Ticker(sym, session=get_session())
+                    t = yf.Ticker(sym)
                     hist = await asyncio.to_thread(t.history, period="1d", interval="1m")
                     if not hist.empty and len(hist) > 5:
                         price = hist['Close'].iloc[-1]
@@ -245,7 +245,7 @@ async def get_overview():
             category_data = []
             for sym in symbols:
                 try:
-                    t = yf.Ticker(sym, session=get_session())
+                    t = yf.Ticker(sym)
                     hist = await asyncio.to_thread(t.history, period="2d")
                     if not hist.empty:
                         price = float(hist['Close'].iloc[-1])
@@ -264,7 +264,7 @@ async def get_overview():
         indices = []
         for name, sym in {"NIFTY 50": "^NSEI", "SENSEX": "^BSESN", "S&P 500": "^GSPC", "NASDAQ": "^IXIC"}.items():
             try:
-                t = yf.Ticker(sym, session=get_session())
+                t = yf.Ticker(sym)
                 hist = await asyncio.to_thread(t.history, period="2d")
                 if not hist.empty:
                     price = float(hist['Close'].iloc[-1])
@@ -287,7 +287,7 @@ async def get_chart(ticker: str, interval: str = "1m"):
     if not ticker.startswith("^") and "=" not in ticker and ".NS" not in ticker and ".BS" not in ticker:
         sym = f"{ticker}.NS"
         
-    t = yf.Ticker(sym, session=get_session())
+    t = yf.Ticker(sym)
     hist = await asyncio.to_thread(t.history, period=period, interval=interval)
     
     # Fallback if specific interval fails
@@ -416,7 +416,7 @@ async def deep_research(ticker: str):
     try:
         log_system(f"Starting deep research for {ticker}")
         sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") and "=" not in ticker else ticker
-        t = yf.Ticker(sym, session=YF_SESSION)
+        t = yf.Ticker(sym)
         info = await asyncio.to_thread(lambda: t.info)
         
         try:
@@ -476,7 +476,7 @@ async def compare_stocks(t1: str, t2: str):
     try:
         def get_data(ticker):
             sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
-            tk = yf.Ticker(sym, session=YF_SESSION)
+            tk = yf.Ticker(sym)
             hist = tk.history(period="1mo")
             if hist.empty: return None
             # Return relative returns
