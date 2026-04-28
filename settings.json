@@ -1,0 +1,1 @@
+{"theme": "dark", "notifications": true, "favorites": ["RELIANCE.NS", "TCS.NS", "^NSEI"], "llm_provider": "nvidia_nim", "llm_model": "meta/llama-3.1-405b-instruct", "risk_profile": "growth", "tier_weights": {"tier1": 50, "tier2": 30, "tier3": 58}}
