@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager, contextmanager
 import json
 import asyncio
 import threading
@@ -7,11 +6,13 @@ import sqlite3
 import time
 import random
 import requests
+import math
 import yfinance as yf
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List, Optional, Any
+from contextlib import asynccontextmanager, contextmanager
 import uvicorn
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv, set_key
@@ -19,90 +20,63 @@ from datetime import datetime
 import openai
 import anthropic
 from cryptography.fernet import Fernet
-import signal
-from contextlib import contextmanager
 
-try:
-    from plyer import notification
-except ImportError:
-    notification = None
-
-from apscheduler.schedulers.background import BackgroundScheduler
-
-# ── Paths & Security ─────────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ENV_PATH = os.path.join(BASE_DIR, ".env")
-SETTINGS_PATH = os.path.join(BASE_DIR, "settings.json")
-DB_PATH = os.path.join(BASE_DIR, "finintel.db")
+# ── Setup ────────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(os.path.dirname(BASE_DIR), ".env")
+DB_PATH = os.path.join(os.path.dirname(BASE_DIR), "finintel.db")
+SETTINGS_PATH = os.path.join(os.path.dirname(BASE_DIR), "settings.json")
 LOG_PATH = os.path.join(BASE_DIR, "system.log")
-KEY_PATH = os.path.join(BASE_DIR, "secret.key")
 
 load_dotenv(ENV_PATH)
 
-def get_or_create_key():
-    if not os.path.exists(KEY_PATH):
+# Encryption Engine
+def get_fernet():
+    key_path = os.path.join(os.path.dirname(BASE_DIR), "secret.key")
+    if not os.path.exists(key_path):
         key = Fernet.generate_key()
-        with open(KEY_PATH, "wb") as f: f.write(key)
-        return key
-    with open(KEY_PATH, "rb") as f: return f.read()
+        with open(key_path, "wb") as f: f.write(key)
+    with open(key_path, "rb") as f: return Fernet(f.read())
 
-FERNET = Fernet(get_or_create_key())
+cipher = get_fernet()
 
 def encrypt_val(val: str) -> str:
-    if not val: return ""
-    return FERNET.encrypt(val.encode()).decode()
+    return cipher.encrypt(val.encode()).decode() if val else ""
 
 def decrypt_val(val: str) -> str:
-    if not val: return ""
-    try: return FERNET.decrypt(val.encode()).decode()
-    except: return val
-
-def sanitize_data(obj):
-    """Sanitize data to handle NaN/Inf for JSON compliance"""
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj): return 0
-        return obj
-    if isinstance(obj, dict):
-        return {k: sanitize_data(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [sanitize_data(x) for x in obj]
-    return obj
+    try: return cipher.decrypt(val.encode()).decode() if val else ""
+    except: return ""
 
 # ── Database Engine ──────────────────────────────────────────────────
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute("""CREATE TABLE IF NOT EXISTS chat_history 
+                     (id INTEGER PRIMARY KEY, role TEXT, content TEXT, timestamp TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS semantic_memory 
+                     (id INTEGER PRIMARY KEY, key TEXT, value TEXT, importance INTEGER)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS research_history 
+                     (id INTEGER PRIMARY KEY, ticker TEXT, data TEXT, timestamp TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS saved_opportunities 
+                     (id INTEGER PRIMARY KEY, ticker TEXT, reason TEXT, timestamp TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS notifications 
+                     (id INTEGER PRIMARY KEY, asset TEXT, event_type TEXT, message TEXT, timestamp TEXT)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS price_alerts 
+                     (id INTEGER PRIMARY KEY, ticker TEXT, target REAL, condition TEXT, active INTEGER)""")
+        conn.commit()
+
 @contextmanager
 def db_session():
     conn = sqlite3.connect(DB_PATH)
-    try:
-        yield conn.cursor()
-        conn.commit()
-    finally:
-        conn.close()
+    try: yield conn.cursor()
+    finally: conn.commit(); conn.close()
 
-def init_db():
-    with db_session() as c:
-        c.execute('''CREATE TABLE IF NOT EXISTS chat_history (id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT, content TEXT, timestamp DATETIME)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS semantic_memory (id INTEGER PRIMARY KEY AUTOINCREMENT, summary TEXT, timestamp DATETIME)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS research_history (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT, analysis TEXT, score INTEGER, timestamp DATETIME)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, asset TEXT, event_type TEXT, message TEXT, timestamp DATETIME)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS price_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT, target REAL, condition TEXT, active INTEGER)''')
-        c.execute('''CREATE TABLE IF NOT EXISTS saved_opportunities (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT, verdict TEXT, score INTEGER, timestamp DATETIME)''')
+# ── Memory & Intelligence ────────────────────────────────────────────
+def log_system(msg):
+    with open(LOG_PATH, "a") as f:
+        f.write(f"[{datetime.now().isoformat()}] {msg}\n")
 
-# ── Cache Engine ──────────────────────────────────────────────────────
-class SmartCache:
-    def __init__(self, ttl=300):
-        self._store = {}
-        self._ttl = ttl
-    def get(self, key):
-        if key in self._store:
-            val, ts = self._store[key]
-            if time.time() - ts < self._ttl: return val
-        return None
-    def set(self, key, val):
-        self._store[key] = (val, time.time())
-
-CACHE = SmartCache(ttl=600)
-
-# ── Elite Financial Source Matrix (MEGA PROJECT EXCLUSIVE) ─────────────
+# ── Elite Financial Source Matrix ─────────────
 ELITE_SOURCES = [
     "economictimes.indiatimes.com", "livemint.com", "moneycontrol.com", "business-standard.com",
     "ndtvprofit.com", "zeebiz.com", "thehindubusinessline.com", "businesstoday.in",
@@ -118,24 +92,25 @@ ELITE_SOURCES = [
     "rmoneyindia.com", "coindcx.com", "wazirx.com", "tradingview.com"
 ]
 
-def log_system(msg):
-    with open(LOG_PATH, "a") as f:
-        f.write(f"[{datetime.now().isoformat()}] {msg}\n")
+# ── Global Settings ──────────────────────────────────────────────────
+def load_settings():
+    if os.path.exists(SETTINGS_PATH):
+        with open(SETTINGS_PATH, "r") as f: return json.load(f)
+    return {"llm_provider": "openai", "llm_model": "gpt-4o", "favorites": ["^NSEI"], "notifications_enabled": True}
 
-# ── LLM Orchestration ────────────────────────────────────────────────
+settings = load_settings()
+
 # ── Multi-Provider Mesh Logic ──────────────────────────────────────────
-PROVIDER_PRIORITY = ["nvidia", "openai", "anthropic", "groq"]
+PROVIDER_PRIORITY = ["nvidia", "openai", "anthropic", "groq", "gemini"]
 
 async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False, task_type: str = "general", forced_settings: Optional[Dict] = None):
-    """Resilient Multi-Provider Mesh with Auto-Fallback & Retry"""
     active_settings = forced_settings or settings
     primary_provider = active_settings.get("llm_provider", "openai")
     
-    # Task-Based Model Selection
     TASK_MODELS = {
-        "sentinel": {"groq": "llama-3.1-70b-versatile", "nvidia": "meta/llama-3.1-70b-instruct"},
+        "sentinel": {"groq": "llama-3.1-70b-versatile", "nvidia": "meta/llama-3.1-70b-instruct", "anthropic": "claude-3-haiku-20240307"},
         "research": {"nvidia": "meta/llama-3.1-70b-instruct", "openai": "gpt-4o", "anthropic": "claude-3-5-sonnet-20240620"},
-        "general": {"openai": "gpt-4o", "groq": "llama-3.1-70b-versatile"}
+        "general": {"openai": "gpt-4o", "groq": "llama-3.1-70b-versatile", "gemini": "gemini-1.5-pro"}
     }
 
     providers_to_try = [primary_provider] + [p for p in PROVIDER_PRIORITY if p != primary_provider]
@@ -160,415 +135,231 @@ async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False, task
                     if json_mode: args["response_format"] = {"type": "json_object"}
                     
                     res = await client.chat.completions.create(**args)
-                    return json.loads(res.choices[0].message.content) if json_mode else res.choices[0].message.content
+                    content = res.choices[0].message.content
+                    return json.loads(content) if json_mode else content
                 
                 if provider == "anthropic":
                     client = anthropic.AsyncAnthropic(api_key=api_key)
                     sys_msg = next((m["content"] for m in messages if m["role"] == "system"), "Expert Advisor")
                     filtered = [m for m in messages if m["role"] != "system"]
                     res = await client.messages.create(model=model, system=sys_msg, messages=filtered, max_tokens=2048)
-                    return json.loads(res.content[0].text) if json_mode else res.content[0].text
+                    content = res.content[0].text
+                    return json.loads(content) if json_mode else content
                     
             except Exception as e:
                 log_system(f"Attempt {attempt+1} failed for {provider}: {e}")
                 await asyncio.sleep(2)
         
-        log_system(f"❌ {provider} exhausted. Falling back in the mesh...")
-    
     return {"error": "CRITICAL: Sovereign mesh failed. All providers exhausted."}
 
-# ── App Init ─────────────────────────────────────────────────────────
-DEFAULT_SETTINGS = {
-    "llm_provider": "openai",
-    "llm_model": "gpt-4o",
-    "language": "English",
-    "risk_profile": "Moderate",
-    "favorites": ["RELIANCE", "TCS", "^NSEI"],
-    "tier_weights": {"tier1": 50, "tier2": 30, "tier3": 20},
-    "alert_threshold": 1.5,
-    "disclaimer": "FinIntel Pro is a research tool only. Not SEBI registered advisory. All trades at your own risk."
-}
+# ── Data Sanitizer ───────────────────────────────────────────────────
+def sanitize_data(obj):
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj): return 0
+        return obj
+    if isinstance(obj, dict): return {k: sanitize_data(v) for k, v in obj.items()}
+    if isinstance(obj, list): return [sanitize_data(x) for x in obj]
+    return obj
 
-def load_settings():
-    if not os.path.exists(SETTINGS_PATH): return DEFAULT_SETTINGS
-    with open(SETTINGS_PATH, "r") as f: return json.load(f)
-
-settings = load_settings()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    scheduler.add_job(check_market_events, 'interval', minutes=5)
-    scheduler.add_job(autonomous_sentinel_news, 'interval', minutes=15)
-    scheduler.start()
-    init_db()
-    log_system("KERNEL ONLINE: SENTINEL ACTIVE")
-    yield
-    # Shutdown
-    scheduler.shutdown()
-    log_system("KERNEL OFFLINE")
-
-app = FastAPI(title="FinIntel Sovereign Kernel", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-
-# ── Background Sentinel Monitor (MEGA PROJECT UPGRADE) ────────────────
-def check_market_events():
-    threshold = settings.get("alert_threshold", 1.5)
-    favs = settings.get("favorites", ["^NSEI"])
+# ── Market Logic ─────────────────────────────────────────────────────
+class SmartCache:
+    _store = {}
     
-    # Check Price Alerts
-    with db_session() as c:
-        c.execute("SELECT id, ticker, target, condition FROM price_alerts WHERE active = 1")
-        alerts = c.fetchall()
-        
-    for aid, ticker, target, cond in alerts:
+    @classmethod
+    def set(cls, key, val): cls._store[key] = (val, time.time())
+    
+    @classmethod
+    def get(cls, key, ttl=60):
+        if key in cls._store:
+            val, ts = cls._store[key]
+            if time.time() - ts < ttl: return val
+        return None
+
+async def get_market_overview_internal():
+    cached = SmartCache.get("overview", ttl=60)
+    if cached: return cached
+    
+    favs = settings.get("favorites", ["^NSEI", "RELIANCE.NS", "TCS.NS", "BTC-INR", "ETH-INR"])
+    results = []
+    for ticker in favs:
         try:
-            sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
-            t = yf.Ticker(sym)
+            t = yf.Ticker(ticker)
             h = t.history(period="1d")
             if h.empty: continue
             cur = h['Close'].iloc[-1]
-            triggered = (cond == ">=" and cur >= target) or (cond == "<=" and cur <= target)
-            if triggered:
-                msg = f"PRICE ALERT: {ticker} reached ₹{cur:.2f} ({cond} ₹{target})"
-                with db_session() as c:
-                    c.execute("UPDATE price_alerts SET active = 0 WHERE id = ?", (aid,))
-                    c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
-                              (ticker, "Target Reached", msg, datetime.now().isoformat()))
-                if notification: notification.notify(title=f"FinIntel: {ticker}", message=msg)
-        except: pass
+            prev = h['Open'].iloc[0]
+            change = ((cur - prev) / prev) * 100
+            results.append({
+                "symbol": ticker,
+                "price": round(cur, 2),
+                "change": round(change, 2),
+                "high": round(h['High'].max(), 2),
+                "low": round(h['Low'].min(), 2)
+            })
+        except: continue
+    
+    # Mocking categories for UI alignment
+    final_data = {
+        "Stocks": results,
+        "categories": [
+            {"name": "Energy", "sentiment": random.randint(30, 90)},
+            {"name": "Tech", "sentiment": random.randint(30, 90)},
+            {"name": "Finance", "sentiment": random.randint(30, 90)},
+            {"name": "Crypto", "sentiment": random.randint(30, 90)}
+        ]
+    }
+    SmartCache.set("overview", final_data)
+    return final_data
 
-    # Check Volatility
-    for ticker in favs:
-        try:
-            sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
-            t = yf.Ticker(sym)
-            hist = t.history(period="1d", interval="5m")
-            if hist.empty or len(hist) < 2: continue
-            change = ((hist['Close'].iloc[-1] - hist['Open'].iloc[-1]) / hist['Open'].iloc[-1]) * 100
-            if abs(change) > threshold:
-                msg = f"{ticker} shifted {change:.2f}% (Threshold: {threshold}%)"
-                with db_session() as c:
-                    c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
-                              (ticker, "Volatility Spike", msg, datetime.now().isoformat()))
-                if notification: notification.notify(title=f"FinIntel: {ticker}", message=msg)
-        except Exception as e: log_system(f"Monitor error for {ticker}: {e}")
-
+# ── Background Sentinel ──────────────────────────────────────────────
 async def autonomous_sentinel_news():
-    """Autonomous Intelligence Scraper for Indian Titans (Big Bulls), SEBI, and Global Events"""
-    log_system("Sentinel Scanning Indian Titans & Global Events...")
+    if not settings.get("notifications_enabled", True): return
+    log_system("Sentinel Scanning Elite Matrix...")
     try:
         with DDGS() as ddgs:
-            # Targeted Intelligence Queries using ELITE_SOURCES Matrix
-            sampled = random.sample(ELITE_SOURCES, 10)
-            queries = [
-                f"site:{sampled[0]} Elon Musk crypto announcement May 1st",
-                f"site:{sampled[1]} Vijay Kedia Mukul Agrawal latest portfolio",
-                f"site:{sampled[2]} Ashish Kacholia new multibagger discovery",
-                f"site:{sampled[3]} SEBI RBI regulatory shift today",
-                f"site:{sampled[4]} MicroStrategy Michael Saylor Bitcoin purchase",
-                f"site:{sampled[5]} upcoming crypto newbie currency launch"
-            ]
+            sampled = random.sample(ELITE_SOURCES, 5)
+            curr_date = datetime.now().strftime("%B %Y")
+            queries = [f"site:{s} market breaking news {curr_date}" for s in sampled]
+            
             raw_news = []
             for q in queries:
-                raw_news.extend(list(ddgs.text(q, max_results=3)))
+                try: raw_news.extend(list(ddgs.text(q, max_results=2)))
+                except: continue
             
-            snippets = [f"{r.get('title')}: {r.get('body')}" for r in raw_news]
-            prompt = f"""
-            Analyze these headlines for PREDICTIVE market-moving events. 
-            Watchlist: Elon Musk, Michael Saylor, Cathie Wood, Jensen Huang, Vijay Kedia.
+            if not raw_news: return
             
-            Find mentions of: Upcoming launches, new currencies, secret statements, or hidden institutional moves.
-            If something huge is about to happen (e.g. Elon May 1st), return 'critical': true.
-            Return JSON: 
-            {{ 
-              'critical': true/false, 
-              'event': 'Prediction: [Event Name]', 
-              'summary': 'Synthesized leak/info - what is coming and when?', 
-              'tickers': [tickers affected],
-              'source_consensus': 'High/Medium/Low' 
-            }}
-            News: {' '.join(snippets[:20])}
-            """
+            snippets = [f"{n['title']}: {n['body']}" for n in raw_news]
+            prompt = [{"role": "system", "content": "You are a market sentinel. Identify critical triggers."},
+                      {"role": "user", "content": f"Analyze these news snippets and return a JSON list of alerts: {snippets[:10]}"}]
             
-            res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
-            analysis = json.loads(res)
-            
-            if analysis.get("critical"):
-                event = analysis.get("event")
-                msg = analysis.get("summary")
-                log_system(f"🚨 SENTINEL TITAN ALERT: {event}")
-                
+            alerts = await call_llm(prompt, json_mode=True, task_type="sentinel")
+            if isinstance(alerts, list):
                 with db_session() as c:
-                    c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
-                              ("TITAN", event, msg, datetime.now().isoformat()))
-                
-                if notification:
-                    notification.notify(title=f"FinIntel TITAN: {event}", message=msg, app_name="FinIntel Pro")
-                
-                # Auto-trigger Deep Research for tickers found
-                for ticker in analysis.get("tickers", []):
-                    log_system(f"Auto-triggering research for {ticker}...")
-                    asyncio.create_task(deep_research(ticker))
-    except Exception as e:
-        log_system(f"Sentinel News Error: {e}")
+                    for a in alerts:
+                        c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
+                                  (a.get("asset", "Market"), "Intelligence Trigger", a.get("message"), datetime.now().isoformat()))
+    except Exception as e: log_system(f"Sentinel Error: {e}")
 
-scheduler = BackgroundScheduler()
+def sentinel_thread():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    while True:
+        loop.run_until_complete(autonomous_sentinel_news())
+        time.sleep(900)
 
-# ── Endpoints ────────────────────────────────────────────────────────
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "uptime": round(time.time(), 0), "db": os.path.exists(DB_PATH), "api_key_encrypted": os.path.exists(KEY_PATH), "scheduler_active": scheduler.running, "memory_usage": "245MB", "latency_p99": "240ms"}
+# ── FastAPI App ──────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    threading.Thread(target=sentinel_thread, daemon=True).start()
+    yield
 
-@app.get("/market/pulse")
-async def get_pulse():
-    cached = CACHE.get("pulse")
-    if cached: return cached
+app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/market/overview")
+async def get_overview():
+    data = await get_market_overview_internal()
+    return sanitize_data(data)
+
+@app.get("/market/chart/{ticker}")
+async def get_chart(ticker: str):
+    cached = SmartCache.get(f"chart_{ticker}", ttl=60)
+    if cached: return sanitize_data(cached)
+    
+    sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
     try:
+        t = yf.Ticker(sym)
+        h = t.history(period="1mo", interval="1d")
+        if h.empty: return []
+        chart = []
+        for i, row in h.iterrows():
+            chart.append({
+                "time": i.strftime("%Y-%m-%d"),
+                "open": row['Open'],
+                "high": row['High'],
+                "low": row['Low'],
+                "close": row['Close'],
+                "volume": row['Volume']
+            })
+        SmartCache.set(f"chart_{ticker}", chart)
+        return sanitize_data(chart)
+    except: return []
+
+@app.get("/market/notifications")
+async def get_notifications():
+    with db_session() as c:
+        c.execute("SELECT asset, event_type, message, timestamp FROM notifications ORDER BY id DESC LIMIT 20")
+        rows = c.fetchall()
+    return [{"asset": r[0], "type": r[1], "message": r[2], "time": r[3]} for r in rows]
+
+@app.get("/market/research/{ticker}")
+async def deep_research(ticker: str):
+    sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
+    try:
+        t = yf.Ticker(sym)
+        info = await asyncio.to_thread(lambda: t.info)
+        
         with DDGS() as ddgs:
-            raw = list(ddgs.text("NIFTY 50 market news trend today", max_results=5))
-            news = [r.get('body', '') for r in raw]
-            headlines = [r.get('title', '') for r in raw]
-        prompt = f"Analyze these news snippets and return JSON: {{ 'score': 0-100, 'verdict': 'Bullish/Bearish/Neutral' }}. News: {' '.join(news)}"
-        res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
-        pulse = json.loads(res)
-        pulse["headlines"] = headlines
-        CACHE.set("pulse", pulse)
-        return pulse
-    except: return {"score": 50, "verdict": "Neutral", "headlines": ["Data temporarily unavailable"]}
+            sampled = random.sample(ELITE_SOURCES, 3)
+            news = list(ddgs.text(f"site:{sampled[0]} {ticker} analysis", max_results=3))
+        
+        prompt = [{"role": "system", "content": "Analyze investment quality."},
+                  {"role": "user", "content": f"Data: {info.get('longBusinessSummary','')} | News: {news}"}]
+        
+        res = await call_llm(prompt, json_mode=True, task_type="research")
+        res["provider"] = settings.get("llm_provider") # Track which mesh node worked
+        return res
+    except Exception as e: return {"error": str(e)}
 
-@app.post("/auth/verify")
-async def verify_llm(data: Dict[str, str]):
-    provider, model, key = data.get("provider"), data.get("model"), data.get("key")
-@app.post("/settings/verify")
-async def verify_settings(data: Dict[str, Any]):
-    provider = data.get("provider")
-    model = data.get("model")
-    key = data.get("key")
-    
-    # Temporarily override settings for verification test
-    test_settings = {"llm_provider": provider, "llm_model": model, f"{provider}_api_key": key}
-    
-    try:
-        # Perform a tiny handshake call
-        test_msg = [{"role": "user", "content": "ping"}]
-        # We manually call the provider logic here to avoid messing with global state
-        response = await call_llm(test_msg, forced_settings=test_settings)
-        if response and not isinstance(response, dict):
-            return {"status": "success", "message": f"Successfully connected to {model} via {provider}"}
-        return {"status": "error", "message": str(response)}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+@app.get("/settings")
+async def get_settings():
+    return settings
 
 @app.post("/settings")
 async def save_settings(new_settings: Dict[str, Any]):
     global settings
-    # Encrypt keys if they are new
     for k, v in new_settings.items():
         if "_api_key" in k and v and not v.startswith("gAAAA"):
-            new_settings[k] = encrypt_key(v)
-    
+            new_settings[k] = encrypt_val(v)
     settings.update(new_settings)
     with open(SETTINGS_PATH, "w") as f: json.dump(settings, f)
     return {"status": "success"}
 
-@app.get("/market/compare")
-async def compare_assets(t1: str, t2: str):
-    try:
-        s1 = f"{t1}.NS" if "." not in t1 and not t1.startswith("^") else t1
-        s2 = f"{t2}.NS" if "." not in t2 and not t2.startswith("^") else t2
-        t1_hist = await asyncio.to_thread(yf.Ticker(s1).history, period="1mo")
-        t2_hist = await asyncio.to_thread(yf.Ticker(s2).history, period="1mo")
-        t1_data = (t1_hist['Close'] / t1_hist['Close'].iloc[0] * 100).tolist()
-        t2_data = (t2_hist['Close'] / t2_hist['Close'].iloc[0] * 100).tolist()
-        prompt = f"Compare {t1} vs {t2} based on 1-month performance (relative). Provide a strategic advice (1 sentence) for a retail investor."
-        insight = await call_llm([{"role": "user", "content": prompt}])
-        return {"t1": t1, "t2": t2, "t1_data": t1_data, "t2_data": t2_data, "insight": insight}
-    except Exception as e: return {"error": str(e)}
-
-@app.get("/market/overview")
-async def get_overview():
-    try:
-        data = await SmartCache.get_overview()
-        return sanitize_data(data)
-    except Exception as e:
-        log_system(f"Overview Error: {e}")
-        return {"error": str(e)}
-
-@app.get("/market/sectors")
-async def get_sectors():
-    cached = CACHE.get("sectors")
-    if cached: return cached
-    overview = await get_overview()
-    stocks = overview.get("Stocks", [])
-    sectors = {}
-    for s in stocks:
-        sec = s.get("sector", "Other")
-        sectors[sec] = sectors.get(sec, 0) + s.get("price", 0)
-    total = sum(sectors.values())
-    formatted = [{"name": k, "value": round((v/total)*100, 2)} for k, v in sectors.items()]
-    CACHE.set("sectors", formatted)
-    return formatted
-
-@app.post("/market/alerts")
-async def create_alert(data: Dict[str, Any]):
-    ticker, target, cond = data.get("ticker"), data.get("target"), data.get("condition")
-    with db_session() as c:
-        c.execute("INSERT INTO price_alerts (ticker, target, condition, active) VALUES (?, ?, ?, 1)", (ticker, target, cond))
-    return {"status": "success"}
-
-@app.get("/market/alerts")
-async def get_price_alerts():
-    with db_session() as c:
-        c.execute("SELECT id, ticker, target, condition, active FROM price_alerts ORDER BY id DESC")
-        rows = c.fetchall()
-    return [{"id": r[0], "ticker": r[1], "target": r[2], "condition": r[3], "active": r[4]} for r in rows]
-
-@app.get("/market/chart/{ticker}")
-async def get_chart(ticker: str):
-    try:
-        data = await SmartCache.get_chart(ticker)
-        return sanitize_data(data)
-    except Exception as e: return {"error": str(e)}
-
-@app.get("/market/research/{ticker}")
-async def deep_research(ticker: str):
-    """MEGA PROJECT RESEARCH: Deep dives into socials, Yahoo Finance, and news to find Moats, Financials, and Timing."""
-    sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
-    try:
-        def ddg_search(q):
-            with DDGS() as ddgs: return [r.get('body', '') for r in ddgs.text(q, max_results=5)]
-        
-        t1_info = await asyncio.to_thread(lambda: yf.Ticker(sym).info)
-        
-        # Source Matrix Search
-        sampled_sites = random.sample(ELITE_SOURCES, 8)
-        news_q = " OR ".join([f"site:{s}" for s in sampled_sites[:4]])
-        sentiment_q = " OR ".join([f"site:{s}" for s in sampled_sites[4:]])
-        
-        t2_news, t3_social, t4_finance = await asyncio.gather(
-            asyncio.to_thread(ddg_search, f"({news_q}) {ticker} news"),
-            asyncio.to_thread(ddg_search, f"({sentiment_q}) {ticker} sentiment analysis"),
-            asyncio.to_thread(ddg_search, f"{ticker} financial health roadmap")
-        )
-        
-        lang = settings.get("language", "English")
-        risk = settings.get("risk_profile", "Moderate")
-        
-        prompt = f"""
-        Execute MEGA RESEARCH for {ticker} ({lang}).
-        Risk Profile: {risk}.
-        Data Sources:
-        - Info: {t1_info.get('longBusinessSummary','')}
-        - News: {' '.join(t2_news)}
-        - Socials: {' '.join(t3_social)}
-        - Financials: {' '.join(t4_finance)}
-        
-        Return JSON EXACTLY: 
-        {{
-          'Score': 0-100,
-          'Verdict': 'BUY/SELL/HOLD',
-          'Summary': 'Detailed 3-sentence summary',
-          'Investment_Rationale': 'Why or why not?',
-          'Strategy': 'LONG-TERM or SHORT-TERM and why',
-          'Company_Size': 'Market cap description',
-          'Asset_Allocation': 'Where do they invest? how do they grow?',
-          'Risks': ['Risk 1', 'Risk 2'],
-          'Moat_Score': 0-10,
-          'Target_Price': 'Expected 12m'
-        }}
-        """
-        res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
-        parsed = json.loads(res)
-        
-        with db_session() as c: 
-            c.execute("INSERT INTO research_history (ticker, analysis, score, timestamp) VALUES (?, ?, ?, ?)", (ticker, res, parsed.get("Score", 0), datetime.now()))
-        
-        return {"ticker": ticker, "analysis": parsed}
-    except Exception as e:
-        log_system(f"Deep Research Error for {ticker}: {e}")
-        return {"error": str(e)}
+@app.post("/settings/verify")
+async def verify_settings(data: Dict[str, Any]):
+    provider, model, key = data.get("provider"), data.get("model"), data.get("key")
+    test_settings = {"llm_provider": provider, "llm_model": model, f"{provider}_api_key": key}
+    res = await call_llm([{"role": "user", "content": "ping"}], forced_settings=test_settings)
+    if isinstance(res, dict) and "error" in res: return {"status": "error", "message": res["error"]}
+    return {"status": "success", "message": f"Verified via {provider}"}
 
 @app.post("/chat")
-async def chat_advisor(data: Dict[str, str]):
+async def chat_advisor(data: Dict[str, Any]):
     msg = data.get("message")
-    if not msg: return {"error": "Message required"}
+    prompt = [{"role": "system", "content": "You are the FinIntel Sovereign Advisor."},
+              {"role": "user", "content": msg}]
+    response = await call_llm(prompt)
+    
     with db_session() as c:
-        c.execute("SELECT summary FROM semantic_memory ORDER BY id DESC LIMIT 5")
-        mems = " | ".join([r[0] for r in c.fetchall()])
-        c.execute("SELECT role, content FROM chat_history ORDER BY id DESC LIMIT 10")
-        hist = "\n".join([f"{r[0]}: {r[1]}" for r in reversed(c.fetchall())])
-        c.execute("SELECT COUNT(*) FROM chat_history")
-        chat_count = c.fetchone()[0]
-    lang = settings.get("language", "English")
-    risk = settings.get("risk_profile", "Moderate")
-    sys = f"You are FinIntel Advisor ({risk} profile). Speak in {lang}. Memory: {mems}\nRecent: {hist}"
-    res = await call_llm([{"role": "system", "content": sys}, {"role": "user", "content": msg}])
-    if isinstance(res, dict) and "error" in res: return res
-    def persist_and_summarize():
-        with db_session() as c:
-            c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("user", msg, datetime.now()))
-            c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("assistant", str(res), datetime.now()))
-            if chat_count > 0 and (chat_count + 1) % 5 == 0:
-                c.execute("SELECT content FROM chat_history ORDER BY id DESC LIMIT 10")
-                recent = "\n".join([r[0] for r in c.fetchall()])
-                summary_prompt = f"Distill these recent interactions into 1 sentence for long-term memory, focusing on user preferences or assets of interest. Interactions: {recent}"
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                summary = loop.run_until_complete(call_llm([{"role": "user", "content": summary_prompt}]))
-                if summary and not isinstance(summary, dict): c.execute("INSERT INTO semantic_memory (summary, timestamp) VALUES (?, ?)", (str(summary), datetime.now()))
-    threading.Thread(target=persist_and_summarize).start()
-    return {"response": str(res)}
+        c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("user", msg, datetime.now().isoformat()))
+        c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("assistant", str(response), datetime.now().isoformat()))
+    
+    return {"response": str(response)}
 
-@app.get("/market/notifications")
-async def get_alerts():
+@app.get("/chat/history")
+async def get_chat_history():
     with db_session() as c:
-        c.execute("SELECT asset, event_type, message, timestamp FROM notifications ORDER BY timestamp DESC LIMIT 50")
+        c.execute("SELECT role, content, timestamp FROM chat_history ORDER BY id ASC LIMIT 50")
         rows = c.fetchall()
-    return [{"asset": r[0], "event": r[1], "message": r[2], "time": r[3]} for r in rows]
+    return [{"role": r[0], "content": r[1], "time": r[2]} for r in rows]
 
-@app.get("/system/logs")
-async def get_logs():
-    if not os.path.exists(LOG_PATH): return []
-    with open(LOG_PATH, "r") as f: lines = f.readlines()
-    return lines[-50:]
-
-@app.get("/market/history")
-async def get_research_history():
-    with db_session() as c:
-        c.execute("SELECT ticker, analysis, score, timestamp FROM research_history ORDER BY timestamp DESC LIMIT 20")
-        rows = c.fetchall()
-    return [{"ticker": r[0], "analysis": json.loads(r[1]), "score": r[2], "time": r[3]} for r in rows]
-
-@app.post("/market/saved")
-async def save_opportunity(data: Dict[str, Any]):
-    ticker, verdict, score = data.get("ticker"), data.get("verdict"), data.get("score")
-    with db_session() as c:
-        c.execute("INSERT INTO saved_opportunities (ticker, verdict, score, timestamp) VALUES (?, ?, ?, ?)", (ticker, verdict, score, datetime.now()))
-    return {"status": "success"}
-
-@app.get("/market/saved")
-async def get_saved():
-    with db_session() as c:
-        c.execute("SELECT id, ticker, verdict, score, timestamp FROM saved_opportunities ORDER BY timestamp DESC")
-        rows = c.fetchall()
-    return [{"id": r[0], "ticker": r[1], "verdict": r[2], "score": r[3], "time": r[4]} for r in rows]
-
-@app.delete("/system/memory")
-async def wipe_memory():
-    with db_session() as c:
-        c.execute("DELETE FROM chat_history")
-        c.execute("DELETE FROM semantic_memory")
-    log_system("KERNEL MEMORY PURGED BY USER.")
-    return {"status": "success", "message": "Semantic and Chat memory purged."}
-
-@app.get("/system/memory")
-async def get_memory_stats():
-    with db_session() as c:
-        c.execute("SELECT summary, timestamp FROM semantic_memory ORDER BY timestamp DESC")
-        mems = c.fetchall()
-    return [{"summary": r[0], "time": r[1]} for r in mems]
-
-init_db()
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
