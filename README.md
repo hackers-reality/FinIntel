@@ -15,7 +15,7 @@ graph TD
         A[Zerodha KiteConnect] -->|Live Holdings/Positions| E[Intelligence Kernel]
         B[yfinance] -->|Indices/VIX/Forex| E
         C[Elite Domain Mesh] -->|High-Authority Research| E
-        D[OpenAI GPT-4o] -->|Forensic Analysis/Verdict| E
+        D[AI Reasoning Mesh] -->|Forensic Analysis/Verdict| E
     end
 
     subgraph "Intelligence Kernel (Python/FastAPI)"
@@ -37,11 +37,10 @@ graph TD
 ## 📜 Table of Contents
 1. [Core Features](#-core-features)
 2. [Strategic Components](#-strategic-components)
-3. [Zero-Touch Zerodha Auth](#-zero-touch-zerodha-auth)
-4. [Tactical Installation](#-tactical-installation)
-5. [Docker Orchestration](#-docker-orchestration)
+3. [Zerodha Tactical Integration](#-zerodha-tactical-integration)
+4. [AI Reasoning Mesh (Multi-LLM)](#-ai-reasoning-mesh-multi-llm)
+5. [Tactical Installation](#-tactical-installation)
 6. [API Forensic Guide](#-api-forensic-guide)
-7. [Tactical Operations](#-tactical-operations)
 
 ---
 
@@ -56,15 +55,43 @@ graph TD
 
 ---
 
-## 🔑 Zero-Touch Zerodha Auth
+## 🔑 Zerodha Tactical Integration
 
-The Nexus v2.4 now features an autonomous authentication engine. To activate:
+The Nexus v2.4 supports two distinct authentication flows:
 
+### Option A: Zero-Touch Auth (Recommended)
 1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface.
 2. **Inject Strategic Data:** Enter your Zerodha Client ID, Password, and TOTP Secret Key.
 3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. 
-   > [!TIP]
-   > The Nexus will autonomously perform the headless login, generate the TOTP, and synchronize your session key—no manual token generation required.
+
+### Option B: Manual Token Flow (Alternative)
+1. **Developer App:** Set **Redirect URL** to `http://127.0.0.1` in the Kite Dashboard.
+2. **Login URL:** Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
+3. **Extract Token:** Copy the `request_token` from the resulting "broken" page URL bar.
+4. **Generate Session:**
+   ```python
+   from kiteconnect import KiteConnect
+   kite = KiteConnect(api_key="YOUR_API_KEY")
+   data = kite.generate_session("YOUR_TOKEN", api_secret="YOUR_SECRET")
+   print(data["access_token"])
+   ```
+5. **Inject:** Update `ZERODHA_ACCESS_TOKEN` in your `.env`.
+
+---
+
+## 🧠 AI Reasoning Mesh (Multi-LLM)
+
+The Nexus is model-agnostic and supports the following intelligence providers:
+
+| Provider | Model | Variable |
+| :--- | :--- | :--- |
+| **OpenAI** | GPT-4o / GPT-4o-mini | `OPENAI_API_KEY` |
+| **Anthropic** | Claude 3.5 Sonnet | `ANTHROPIC_API_KEY` |
+| **Google** | Gemini 2.0 Pro | `GEMINI_API_KEY` |
+| **NVIDIA** | Llama 3.1 405B | `NVIDIA_API_KEY` |
+
+> [!TIP]
+> The Nexus Kernel automatically detects your active keys in the `.env` and selects the highest-performing available model for strategic synthesis.
 
 ---
 
@@ -74,19 +101,9 @@ The Nexus v2.4 now features an autonomous authentication engine. To activate:
 1. **Prerequisites:** Install Python 3.10+ and Node.js 20+.
 2. **Environment Tuning:**
    ```powershell
-   # Run the Nexus Installer
    .\install.ps1
    ```
 3. **Ignition:** Execute `.\finintel.ps1` or `python run.py`.
-
----
-
-## 🐳 Docker Orchestration
-
-```bash
-# Build and Launch the Nexus Stack
-docker-compose up --build -d
-```
 
 ---
 
@@ -95,16 +112,9 @@ docker-compose up --build -d
 | Provider | Purpose | Data Depth |
 | :--- | :--- | :--- |
 | **KiteConnect** | Primary Brokerage | Live Holdings, PnL, Order Book |
-| **OpenAI** | Reasoning Mesh | Forensic Analysis, Strategic Verdicts |
+| **AI Mesh** | Reasoning | Forensic Analysis, Strategic Verdicts |
 | **Elite Mesh** | Authority Data | Moneycontrol, Livemint, SEBI Filings |
 | **yfinance** | Market Pulse | Indices, VIX, Forex, Sentiment |
-
----
-
-## ⌨️ Tactical Operations
-
-- **`Ctrl+K` / `Cmd+K`**: Launch the **Nexus Command Palette**.
-- **`T`**: Toggle **Terminal Mode** (High-Contrast Monospace).
 
 ---
 **Status: Sovereign & Invincible.**
