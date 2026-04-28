@@ -61,9 +61,9 @@ def run():
 
     if ready:
         print("\n✅ SYSTEM ONLINE")
+        webbrowser.open("http://localhost:5173")
         print("🌍 Command Center: http://localhost:5173")
         print("⚙️  Intelligence API: http://localhost:8008")
-        webbrowser.open("http://localhost:5173")
     else:
         print("\n❌ TIMEOUT: Services failed to synchronize in 60s.")
 
