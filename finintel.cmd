@@ -1,2 +1,2 @@
 @echo off
-python "E:\finintel-pro\run.py" %*
+python "E:\finintel-pro\run.py"

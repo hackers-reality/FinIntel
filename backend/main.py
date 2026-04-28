@@ -5,7 +5,6 @@ import threading
 import sqlite3
 import time
 import random
-import requests
 import math
 import yfinance as yf
 from fastapi import FastAPI, HTTPException, Request
@@ -51,18 +50,12 @@ def decrypt_val(val: str) -> str:
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
-        c.execute("""CREATE TABLE IF NOT EXISTS chat_history 
-                     (id INTEGER PRIMARY KEY, role TEXT, content TEXT, timestamp TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS semantic_memory 
-                     (id INTEGER PRIMARY KEY, key TEXT, value TEXT, importance INTEGER)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS research_history 
-                     (id INTEGER PRIMARY KEY, ticker TEXT, data TEXT, timestamp TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS saved_opportunities 
-                     (id INTEGER PRIMARY KEY, ticker TEXT, reason TEXT, timestamp TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS notifications 
-                     (id INTEGER PRIMARY KEY, asset TEXT, event_type TEXT, message TEXT, timestamp TEXT)""")
-        c.execute("""CREATE TABLE IF NOT EXISTS price_alerts 
-                     (id INTEGER PRIMARY KEY, ticker TEXT, target REAL, condition TEXT, active INTEGER)""")
+        c.execute("CREATE TABLE IF NOT EXISTS chat_history (id INTEGER PRIMARY KEY, role TEXT, content TEXT, timestamp TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS semantic_memory (id INTEGER PRIMARY KEY, key TEXT, value TEXT, importance INTEGER)")
+        c.execute("CREATE TABLE IF NOT EXISTS research_history (id INTEGER PRIMARY KEY, ticker TEXT, data TEXT, timestamp TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS saved_opportunities (id INTEGER PRIMARY KEY, ticker TEXT, reason TEXT, timestamp TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, asset TEXT, event_type TEXT, message TEXT, timestamp TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS price_alerts (id INTEGER PRIMARY KEY, ticker TEXT, target REAL, condition TEXT, active INTEGER)")
         conn.commit()
 
 @contextmanager
@@ -76,7 +69,6 @@ def log_system(msg):
     with open(LOG_PATH, "a") as f:
         f.write(f"[{datetime.now().isoformat()}] {msg}\n")
 
-# ── Elite Financial Source Matrix ─────────────
 ELITE_SOURCES = [
     "economictimes.indiatimes.com", "livemint.com", "moneycontrol.com", "business-standard.com",
     "ndtvprofit.com", "zeebiz.com", "thehindubusinessline.com", "businesstoday.in",
@@ -95,7 +87,9 @@ ELITE_SOURCES = [
 # ── Global Settings ──────────────────────────────────────────────────
 def load_settings():
     if os.path.exists(SETTINGS_PATH):
-        with open(SETTINGS_PATH, "r") as f: return json.load(f)
+        try:
+            with open(SETTINGS_PATH, "r") as f: return json.load(f)
+        except: pass
     return {"llm_provider": "openai", "llm_model": "gpt-4o", "favorites": ["^NSEI"], "notifications_enabled": True}
 
 settings = load_settings()
@@ -126,14 +120,10 @@ async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False, task
         for attempt in range(3):
             try:
                 if provider in ["openai", "groq", "nvidia"]:
-                    base_url = None
-                    if provider == "groq": base_url = "https://api.groq.com/openai/v1"
-                    elif provider == "nvidia": base_url = "https://integrate.api.nvidia.com/v1"
-                    
+                    base_url = "https://integrate.api.nvidia.com/v1" if provider == "nvidia" else ("https://api.groq.com/openai/v1" if provider == "groq" else None)
                     client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
-                    args = {"model": model, "messages": messages, "timeout": 20.0}
+                    args = {"model": model, "messages": messages, "timeout": 25.0}
                     if json_mode: args["response_format"] = {"type": "json_object"}
-                    
                     res = await client.chat.completions.create(**args)
                     content = res.choices[0].message.content
                     return json.loads(content) if json_mode else content
@@ -149,14 +139,13 @@ async def call_llm(messages: List[Dict[str, str]], json_mode: bool = False, task
             except Exception as e:
                 log_system(f"Attempt {attempt+1} failed for {provider}: {e}")
                 await asyncio.sleep(2)
-        
-    return {"error": "CRITICAL: Sovereign mesh failed. All providers exhausted."}
+    return {"error": "CRITICAL: All providers exhausted."}
 
 # ── Data Sanitizer ───────────────────────────────────────────────────
 def sanitize_data(obj):
     if isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj): return 0
-        return obj
+        return round(obj, 2)
     if isinstance(obj, dict): return {k: sanitize_data(v) for k, v in obj.items()}
     if isinstance(obj, list): return [sanitize_data(x) for x in obj]
     return obj
@@ -164,10 +153,8 @@ def sanitize_data(obj):
 # ── Market Logic ─────────────────────────────────────────────────────
 class SmartCache:
     _store = {}
-    
     @classmethod
     def set(cls, key, val): cls._store[key] = (val, time.time())
-    
     @classmethod
     def get(cls, key, ttl=60):
         if key in cls._store:
@@ -178,67 +165,37 @@ class SmartCache:
 async def get_market_overview_internal():
     cached = SmartCache.get("overview", ttl=60)
     if cached: return cached
-    
-    favs = settings.get("favorites", ["^NSEI", "RELIANCE.NS", "TCS.NS", "BTC-INR", "ETH-INR"])
+    favs = settings.get("favorites", ["^NSEI", "RELIANCE.NS", "TCS.NS"])
     results = []
     for ticker in favs:
         try:
             t = yf.Ticker(ticker)
             h = t.history(period="1d")
             if h.empty: continue
-            cur = h['Close'].iloc[-1]
-            prev = h['Open'].iloc[0]
-            change = ((cur - prev) / prev) * 100
-            results.append({
-                "symbol": ticker,
-                "price": round(cur, 2),
-                "change": round(change, 2),
-                "high": round(h['High'].max(), 2),
-                "low": round(h['Low'].min(), 2)
-            })
+            cur, prev = h['Close'].iloc[-1], h['Open'].iloc[0]
+            results.append({"symbol": ticker, "price": cur, "change": ((cur-prev)/prev)*100})
         except: continue
-    
-    # Mocking categories for UI alignment
-    final_data = {
-        "Stocks": results,
-        "categories": [
-            {"name": "Energy", "sentiment": random.randint(30, 90)},
-            {"name": "Tech", "sentiment": random.randint(30, 90)},
-            {"name": "Finance", "sentiment": random.randint(30, 90)},
-            {"name": "Crypto", "sentiment": random.randint(30, 90)}
-        ]
-    }
-    SmartCache.set("overview", final_data)
-    return final_data
+    final = {"Stocks": results, "categories": [{"name": "Tech", "sentiment": 75}, {"name": "Finance", "sentiment": 45}]}
+    SmartCache.set("overview", final)
+    return final
 
 # ── Background Sentinel ──────────────────────────────────────────────
 async def autonomous_sentinel_news():
     if not settings.get("notifications_enabled", True): return
-    log_system("Sentinel Scanning Elite Matrix...")
     try:
         with DDGS() as ddgs:
             sampled = random.sample(ELITE_SOURCES, 5)
-            curr_date = datetime.now().strftime("%B %Y")
-            queries = [f"site:{s} market breaking news {curr_date}" for s in sampled]
-            
-            raw_news = []
-            for q in queries:
-                try: raw_news.extend(list(ddgs.text(q, max_results=2)))
-                except: continue
-            
-            if not raw_news: return
-            
-            snippets = [f"{n['title']}: {n['body']}" for n in raw_news]
-            prompt = [{"role": "system", "content": "You are a market sentinel. Identify critical triggers."},
-                      {"role": "user", "content": f"Analyze these news snippets and return a JSON list of alerts: {snippets[:10]}"}]
-            
-            alerts = await call_llm(prompt, json_mode=True, task_type="sentinel")
-            if isinstance(alerts, list):
+            q = f"site:{random.choice(sampled)} market alert {datetime.now().strftime('%Y-%m-%d')}"
+            raw = list(ddgs.text(q, max_results=5))
+            if not raw: return
+            snippets = [f"{n['title']}: {n['body']}" for n in raw]
+            res = await call_llm([{"role": "user", "content": f"Alert JSON for: {snippets}"}], json_mode=True, task_type="sentinel")
+            if isinstance(res, list):
                 with db_session() as c:
-                    for a in alerts:
+                    for a in res:
                         c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
-                                  (a.get("asset", "Market"), "Intelligence Trigger", a.get("message"), datetime.now().isoformat()))
-    except Exception as e: log_system(f"Sentinel Error: {e}")
+                                  (a.get("asset", "Market"), "Trigger", a.get("message"), datetime.now().isoformat()))
+    except: pass
 
 def sentinel_thread():
     loop = asyncio.new_event_loop()
@@ -255,111 +212,76 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/market/overview")
-async def get_overview():
-    data = await get_market_overview_internal()
-    return sanitize_data(data)
+async def get_overview(): return sanitize_data(await get_market_overview_internal())
 
 @app.get("/market/chart/{ticker}")
 async def get_chart(ticker: str):
-    cached = SmartCache.get(f"chart_{ticker}", ttl=60)
-    if cached: return sanitize_data(cached)
-    
     sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
-    try:
-        t = yf.Ticker(sym)
-        h = t.history(period="1mo", interval="1d")
-        if h.empty: return []
-        chart = []
-        for i, row in h.iterrows():
-            chart.append({
-                "time": i.strftime("%Y-%m-%d"),
-                "open": row['Open'],
-                "high": row['High'],
-                "low": row['Low'],
-                "close": row['Close'],
-                "volume": row['Volume']
-            })
-        SmartCache.set(f"chart_{ticker}", chart)
-        return sanitize_data(chart)
-    except: return []
+    t = yf.Ticker(sym)
+    h = t.history(period="1mo", interval="1d")
+    return sanitize_data([{"time": i.strftime("%Y-%m-%d"), "open": r['Open'], "high": r['High'], "low": r['Low'], "close": r['Close']} for i, r in h.iterrows()])
 
 @app.get("/market/notifications")
 async def get_notifications():
     with db_session() as c:
         c.execute("SELECT asset, event_type, message, timestamp FROM notifications ORDER BY id DESC LIMIT 20")
-        rows = c.fetchall()
-    return [{"asset": r[0], "type": r[1], "message": r[2], "time": r[3]} for r in rows]
+        return [{"asset": r[0], "type": r[1], "message": r[2], "time": r[3]} for r in c.fetchall()]
 
 @app.get("/market/research/{ticker}")
 async def deep_research(ticker: str):
-    sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
-    try:
-        t = yf.Ticker(sym)
-        info = await asyncio.to_thread(lambda: t.info)
-        
-        with DDGS() as ddgs:
-            sampled = random.sample(ELITE_SOURCES, 3)
-            news = list(ddgs.text(f"site:{sampled[0]} {ticker} analysis", max_results=3))
-        
-        prompt = [{"role": "system", "content": "Analyze investment quality."},
-                  {"role": "user", "content": f"Data: {info.get('longBusinessSummary','')} | News: {news}"}]
-        
-        res = await call_llm(prompt, json_mode=True, task_type="research")
-        res["provider"] = settings.get("llm_provider") # Track which mesh node worked
-        return res
-    except Exception as e: return {"error": str(e)}
+    res = await call_llm([{"role": "user", "content": f"Research {ticker}"}], json_mode=True, task_type="research")
+    if isinstance(res, dict): res["provider"] = settings.get("llm_provider")
+    return res
+
+@app.get("/market/traders/news")
+async def get_trader_news():
+    with DDGS() as ddgs:
+        return list(ddgs.text("Indian stock market expert blogs today", max_results=5))
+
+@app.post("/market/favorites/toggle")
+async def toggle_fav(data: Dict[str, str]):
+    ticker = data.get("ticker")
+    favs = settings.get("favorites", [])
+    if ticker in favs: favs.remove(ticker)
+    else: favs.append(ticker)
+    settings["favorites"] = favs
+    with open(SETTINGS_PATH, "w") as f: json.dump(settings, f)
+    return {"status": "success", "favorites": favs}
 
 @app.get("/settings")
-async def get_settings():
-    return settings
+async def get_settings(): return settings
 
 @app.post("/settings")
 async def save_settings(new_settings: Dict[str, Any]):
     global settings
     for k, v in new_settings.items():
-        if "_api_key" in k and v and not v.startswith("gAAAA"):
-            new_settings[k] = encrypt_val(v)
+        if "_api_key" in k and v and not v.startswith("gAAAA"): new_settings[k] = encrypt_val(v)
     settings.update(new_settings)
     with open(SETTINGS_PATH, "w") as f: json.dump(settings, f)
     return {"status": "success"}
 
 @app.post("/settings/verify")
 async def verify_settings(data: Dict[str, Any]):
-    provider, model, key = data.get("provider"), data.get("model"), data.get("key")
-    test_settings = {"llm_provider": provider, "llm_model": model, f"{provider}_api_key": key}
-    res = await call_llm([{"role": "user", "content": "ping"}], forced_settings=test_settings)
-    if isinstance(res, dict) and "error" in res: return {"status": "error", "message": res["error"]}
-    return {"status": "success", "message": f"Verified via {provider}"}
+    res = await call_llm([{"role": "user", "content": "ping"}], forced_settings=data)
+    return {"status": "success" if "error" not in res else "error"}
 
 @app.post("/chat")
 async def chat_advisor(data: Dict[str, Any]):
     msg = data.get("message")
-    prompt = [{"role": "system", "content": "You are the FinIntel Sovereign Advisor."},
-              {"role": "user", "content": msg}]
-    response = await call_llm(prompt)
-    
+    res = await call_llm([{"role": "user", "content": msg}])
     with db_session() as c:
         c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("user", msg, datetime.now().isoformat()))
-        c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("assistant", str(response), datetime.now().isoformat()))
-    
-    return {"response": str(response)}
+        c.execute("INSERT INTO chat_history (role, content, timestamp) VALUES (?, ?, ?)", ("assistant", str(res), datetime.now().isoformat()))
+    return {"response": str(res)}
 
 @app.get("/chat/history")
 async def get_chat_history():
     with db_session() as c:
         c.execute("SELECT role, content, timestamp FROM chat_history ORDER BY id ASC LIMIT 50")
-        rows = c.fetchall()
-    return [{"role": r[0], "content": r[1], "time": r[2]} for r in rows]
+        return [{"role": r[0], "content": r[1], "time": r[2]} for r in c.fetchall()]
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
