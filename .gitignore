@@ -1,35 +1,30 @@
-# Logs
-logs
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+*.sqlite
+database.db
 
-node_modules
-dist
-dist-ssr
+# Node
+node_modules/
+dist/
+dist-ssr/
 *.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Environment variables
-.env
-.env.local
-
-# Local execution scripts
-finintel
-finintel.cmd
-finintel-pro@0.0.0
-*.db
-*.log
+# Project Specific
+secret.key
+system.log
+backend/system.log
+backend/__pycache__/
+backend/*.db
