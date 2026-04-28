@@ -3,7 +3,7 @@ Write-Host "Installing FinIntel Pro Dependencies..." -ForegroundColor Cyan
 
 # 1. Install Python deps
 Write-Host "Setting up Python backend..." -ForegroundColor Yellow
-pip install fastapi uvicorn yfinance duckduckgo-search python-dotenv openai anthropic requests plyer
+pip install fastapi uvicorn yfinance duckduckgo-search python-dotenv openai anthropic requests plyer cryptography apscheduler
 
 # 2. Install Node deps
 Write-Host "Setting up React frontend..." -ForegroundColor Yellow

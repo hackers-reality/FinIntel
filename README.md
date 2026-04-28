@@ -1,53 +1,27 @@
-# FinIntel Pro — Indian Market Strategic Advisor 🇮🇳
+# FinIntel Pro: Strategic Financial Intelligence
 
-FinIntel Pro is a high-performance, real-time market intelligence platform designed for Indian stock, forex, and crypto markets. It combines live NSE/BSE data with autonomous web crawling (Twitter, Reddit, News) and LLM-powered sentiment analysis to provide a streamlined strategic dashboard.
+FinIntel Pro is a production-grade, self-hosted financial intelligence platform designed for experienced traders in the Indian market. It synthesizes multi-tier data using state-of-the-art LLMs to provide real-time investment insights.
 
-## 📌 Features
-- **Real-time NSE Data**: Live price tracking for NIFTY 50, SENSEX, and top Indian stocks.
-- **AI Sentiment Hub**: Aggregates heatmaps from social media and news signals.
-- **Deep Research**: One-click autonomous deep-dive into any ticker using GPT-4o or Llama 3.
-- **Trader News**: Real-time portfolio move tracking of legends like Rakesh Jhunjhunwala and Vijay Kedia.
-- **Desktop Alerts**: Get notified of significant market surges or drops instantly.
+## 🚀 Core Features
 
----
+- **Autonomous Research Engine:** Weighted 4-tier data synthesis (Official, Pro News, Social, Blogs).
+- **Deep Moat Analysis:** AI-driven competitive advantage scoring and 12-month target pricing.
+- **Strategic Peer Comparison:** Side-by-side normalized performance analysis for any two assets.
+- **Semantic Memory Advisor:** A conversational assistant that remembers your trading profile and risk appetite.
+- **AES-256 Security:** Encryption at rest for all LLM API keys (OpenAI, Anthropic, NVIDIA, Groq).
+- **Market Monitoring:** 5-minute background volatility checks with desktop and in-app notifications.
+- **Mobile-First Design:** Optimized for Android and Desktop with glassmorphism aesthetics.
 
-## 🚀 Quick Start (One Command)
+## 🛠 Tech Stack
 
-### 1. Installation
-Open PowerShell in the project directory and run:
-```powershell
-./install.ps1
-```
-*This installs all Python and Node.js dependencies and sets up the global `finintel` command.*
+- **Backend:** FastAPI, yfinance, DuckDuckGo Search, APScheduler, Fernet (AES-256).
+- **Frontend:** React, Vite, Framer Motion, Recharts, Lucide, Tailwind CSS.
+- **Database:** SQLite (Chat history, Research logs, Semantic memory).
 
-### 2. Launching the App
-**Restart your terminal**, then simply type:
-```powershell
-finintel
-```
-The dashboard will automatically open in your default browser.
+## 🔒 Security
 
----
+All API keys are encrypted using a locally generated `secret.key`. Never share this file or the `.env` file. The application is designed to run in a trusted local environment or a private VPS.
 
-## 🛠️ Configuration
-API keys are stored locally for security. Rename `.env.example` to `.env` and add your keys:
-- `OPENAI_API_KEY`: For GPT-4o analysis.
-- `GROQ_API_KEY`: For ultra-fast Llama-3 results.
-- `NVIDIA_NIM_API_KEY`: For high-performance enterprise models.
+## ⚖️ Compliance
 
----
-
-## 📂 Project Structure
-- `/backend`: FastAPI server handling data orchestration and LLM logic.
-- `/src`: React + Vite frontend with Tailwind CSS.
-- `run.py`: Unified launcher script.
-- `finintel.db`: Local SQLite database for chat history and research.
-
-## ⚖️ Security
-- **No Keys Pushed**: `.env` is ignored by git.
-- **Local First**: Your data and keys never leave your machine.
-
----
-
-## 📜 License
-MIT License. Created for professional and educational use.
+FinIntel Pro includes mandatory SEBI-compliant disclaimers. This is a research tool and does NOT provide registered financial advice. All investment decisions are the sole responsibility of the user.

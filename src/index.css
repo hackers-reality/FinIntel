@@ -1,25 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --cyan-primary: #22d3ee;
+  --purple-primary: #a855f7;
+  --bg-dark: #020617;
+}
+
 @layer base {
   body {
-    @apply bg-background text-white antialiased selection:bg-primary/30 selection:text-primary;
+    @apply bg-[#020617] text-white antialiased font-['Outfit',sans-serif];
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(34, 211, 238, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.05) 0px, transparent 50%);
   }
 }
 
 @layer components {
-  .glass-card {
-    @apply bg-card backdrop-blur-md border border-white/10 rounded-2xl transition-all duration-300 hover:border-white/20;
+  .glass-panel {
+    @apply bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2rem] shadow-2xl;
   }
   
-  .btn-primary {
-    @apply bg-primary text-black font-semibold px-4 py-2 rounded-lg hover:brightness-110 active:scale-95 transition-all;
+  .premium-gradient {
+    background: linear-gradient(135deg, var(--cyan-primary) 0%, var(--purple-primary) 100%);
   }
 
-  .text-glow {
-    text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-500;
   }
+
+  .nav-item {
+    @apply flex items-center space-x-3 px-5 py-3.5 rounded-2xl transition-all duration-300;
+  }
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.2);
 }
