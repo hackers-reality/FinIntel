@@ -1,33 +1,33 @@
-# 🛡️ Sovereign Intelligence Nexus (v2.2)
-### *The Ultimate Strategic Command Center for Indian Retail Traders*
+# 🛡️ Sovereign Intelligence Nexus (v2.3)
+### *Strategic Command Center for Elite Indian Retail Traders*
 
-> **Status:** Gold Master | **Build:** v2.2 | **System:** Sovereign Intelligence Nexus
+> **Status:** Gold Master Candidate | **Build:** v2.3 | **System:** Sovereign Intelligence Nexus
 
-The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence engine designed to provide retail traders with institutional-grade edge. It synthesizes real-time market data, forensic document analysis, and institutional whale-tracking into a strictly utilitarian, zero-distraction tactical environment.
+The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence engine engineered to provide retail traders with institutional-grade edge. It synthesizes real-time market pulse, forensic document analysis, and institutional whale-tracking into a strictly utilitarian, zero-distraction tactical environment.
 
 ---
 
-## 🗺️ System Architecture (Nexus Map)
+## 🗺️ System Architecture (The Nexus Map)
 
 ```mermaid
 graph TD
     subgraph "External Intelligence Mesh"
         A[Zerodha KiteConnect] -->|Live Holdings/Positions| E[Intelligence Kernel]
-        B[yfinance] -->|Market Indices/VIX/Forex| E
-        C[DuckDuckGo Search] -->|Whale Tracking/News| E
-        D[OpenAI GPT-4o] -->|Forensic Analysis/Research| E
+        B[yfinance] -->|Indices/VIX/Forex| E
+        C[Elite Domain Mesh] -->|High-Authority Research| E
+        D[OpenAI GPT-4o] -->|Forensic Analysis/Verdict| E
     end
 
     subgraph "Intelligence Kernel (Python/FastAPI)"
         E -->|WebSocket Pulse| F[Tactical Interface]
         E -->|SQLite Sync| G[(Nexus DB)]
-        E -->|Sentinel Loop| H[Windows Toast Alerts]
+        E -->|Sentinel Loop| H[Native Toast Alerts]
     end
 
     subgraph "Tactical Interface (React/Vite)"
         F -->|Filing Forensics| I[Risk Analysis]
         F -->|Swords Arena| J[Parallel Duel]
-        F -->|Utilitarian Grid| K[Portfolio Alpha]
+        F -->|Cmd+K Palette| K[Action Nerve Center]
     end
 ```
 
@@ -38,19 +38,19 @@ graph TD
 2. [Strategic Components](#-strategic-components)
 3. [Tactical Installation](#-tactical-installation)
 4. [Docker Orchestration](#-docker-orchestration)
-5. [API Deep-Dive](#-api-deep-dive)
+5. [API Forensic Guide](#-api-forensic-guide)
 6. [Tactical Operations](#-tactical-operations)
 7. [System Hardening](#-system-hardening)
 
 ---
 
 ## 🛡️ Core Features
-- **Zerodha Kite Integration:** Native tracking of live holdings and positions.
+- **Zerodha Kite Pulse:** Native tracking of live holdings and positions.
+- **Elite Domain Mesh:** Research queries weighted against high-authority finance domains (Moneycontrol, ET, SEBI).
 - **Forensic Filing Engine:** LLM-powered scanning of regulatory documents for "fine print" risks.
-- **Whale Trade Sentinel:** Automated tracking of high-profile institutional trades (Vijay Kedia, Ashish Kacholia, etc.).
-- **Strategic Duel Arena:** Parallel research arbitration for head-to-head asset comparison.
-- **System-Level Alerts:** Native Windows notifications for India VIX spikes and Whale detections.
-- **Multi-Turn Chat Context:** Tactical AI Advisor with persistent strategic memory.
+- **Whale Trade Sentinel:** Automated tracking of institutional whale activity via the Strategic Mesh.
+- **Native OS Alerts:** High-priority Windows toast notifications for VIX spikes and Whale detections.
+- **Nexus Command Palette:** `Cmd+K` tactical interface for instant system-wide navigation.
 
 ---
 
@@ -88,13 +88,13 @@ docker-compose up --build -d
 
 ---
 
-## 📡 API Deep-Dive
+## 📡 API Forensic Guide
 
 | Provider | Purpose | Data Depth |
 | :--- | :--- | :--- |
 | **KiteConnect** | Primary Brokerage | Live Holdings, PnL, Order Book |
 | **OpenAI** | Reasoning Mesh | Forensic Analysis, Strategic Verdicts |
-| **DDGS** | Strategic Mesh | Real-time News, Institutional Activity |
+| **Elite Mesh** | High-Authority Data | Moneycontrol, Livemint, SEBI Filings |
 | **yfinance** | Market Pulse | Indices, VIX, Forex, Sentiment |
 
 ---
@@ -102,23 +102,21 @@ docker-compose up --build -d
 ## ⌨️ Tactical Operations
 
 ### Global Hotkeys
+- **`Ctrl+K` / `Cmd+K`**: Launch the **Nexus Command Palette**.
 - **`1-5`**: Switch between Intelligence Tabs.
 - **`T`**: Toggle **Terminal Mode** (High-Contrast Monospace).
-- **`Cmd+K`**: Instant Ticker Search (Future Expansion).
+- **`Esc`**: Close palette or modals.
 
 ### Forensic Filing Scan
-Paste the text of any regulatory filing into the **Research > Filing Analyzer**. The Nexus will extract:
-- Hidden Risk Clauses
-- Regulatory Red Flags
-- Legal Sentiment Verdicts
+Paste the text of any regulatory filing into the **Nexus > Filing Analyzer**. The engine will extract hidden Risk Clauses and Regulatory Red Flags.
 
 ---
 
 ## 🔒 System Hardening
-- **AES-256 Encryption:** All API keys are encrypted at rest using Fernet (secret.key).
+- **AES-256 Encryption:** All API keys are encrypted at rest using Fernet.
 - **Structured Logging:** All intelligence decisions are logged in `system.log` as JSON.
 - **Local-First Privacy:** No data ever leaves your machine except for direct API calls to your configured providers.
 
 ---
 **Status: Sovereign & Invincible.**
-*Engineered for High-Conviction Retail Traders.*
+*The Nexus is Active.*

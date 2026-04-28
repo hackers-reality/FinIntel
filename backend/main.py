@@ -25,6 +25,13 @@ from kiteconnect import KiteConnect
 import threading
 import time
 
+# ── Elite Domain Mesh ────────────────────────────────────────────────
+ELITE_DOMAINS = [
+    "moneycontrol.com", "economictimes.indiatimes.com", "livemint.com",
+    "business-standard.com", "nseindia.com", "bseindia.com", "sebi.gov.in",
+    "bloombergquint.com", "financialexpress.com", "ndtv.com/business"
+]
+
 # ── Native Windows Notifications ─────────────────────────────────────
 try:
     from winotify import Notification
@@ -157,8 +164,6 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allo
 
 @app.get("/market/overview")
 async def market_overview():
-    kite = get_kite_client()
-    # Expanded overview with indices and USD/INR
     tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "USDINR=X"]
     res = []
     for t in tickers:
@@ -178,34 +183,19 @@ async def market_overview():
         
     return {"Stocks": res, "categories": sectors, "market_status": "OPEN" if is_market_open() else "CLOSED"}
 
-@app.post("/chat")
-async def chat(data: Dict):
-    user_msg = data.get("message", "")
-    with db_session() as c:
-        # Fetch last 5 messages for context
-        c.execute("SELECT role, content FROM chat ORDER BY id DESC LIMIT 5")
-        history = [{"role": r[0], "content": r[1]} for r in c.fetchall()][::-1]
-        
-        c.execute("SELECT ticker, qty, price FROM portfolio")
-        port = str(c.fetchall())
-        
-        system_prompt = f"You are the Sovereign Intelligence Nexus Advisor. User Portfolio: {port}. Be tactical and concise."
-        messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_msg}]
-        
-        res = await call_llm(messages)
-        c.execute("INSERT INTO chat (role, content, ts) VALUES (?, ?, ?)", ("user", user_msg, datetime.now().isoformat()))
-        c.execute("INSERT INTO chat (role, content, ts) VALUES (?, ?, ?)", ("assistant", str(res), datetime.now().isoformat()))
-    return {"response": res}
-
 @app.get("/market/research/{ticker}")
 @limiter.limit("10/hour")
 async def deep_research(ticker: str, request: Request):
     t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
     info = t.info
-    with DDGS() as ddgs: news = str(list(ddgs.text(f"{ticker} stock latest buy filings news", max_results=5)))
+    # Weighted Domain Mesh Query
+    domain_query = " OR ".join([f"site:{d}" for d in ELITE_DOMAINS])
+    search_query = f"({ticker} stock news OR filing) ({domain_query})"
     
-    prompt = [{"role": "system", "content": "Return JSON with EXACT keys: Score, Verdict, Summary, Investment_Rationale, Strategy, Risks, Target_Price, Moat_Score."},
-              {"role": "user", "content": f"Ticker: {ticker}. Data: {info}. News: {news}"}]
+    with DDGS() as ddgs: news = str(list(ddgs.text(search_query, max_results=5)))
+    
+    prompt = [{"role": "system", "content": "Return JSON with EXACT keys: Score, Verdict, Summary, Investment_Rationale, Strategy, Risks, Target_Price, Moat_Score. Source Weight: Official Filings > Elite Finance News > General News."},
+              {"role": "user", "content": f"Ticker: {ticker}. Data: {info}. News Mesh: {news}"}]
     res = await call_llm(prompt, json_mode=True)
     return json.loads(res)
 
