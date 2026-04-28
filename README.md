@@ -1,40 +1,25 @@
-# 🚀 FinIntel Pro: Sovereign Market Intelligence Engine
+# 🚀 FinIntel Pro: Sovereign Intelligence Mesh
 
-**FinIntel Pro** is a production-grade, **Native Windows** self-hosted financial intelligence command center. It is optimized for the **NVIDIA NIM** ecosystem alongside OpenAI and Anthropic, delivering ultra-low latency market synthesis for experienced traders.
-
-> [!IMPORTANT]
-> **NATIVE WINDOWS ARCHITECTURE:** This software is integrated directly into the Windows Notification Center for real-time background alerting.
+**FinIntel Pro** is a production-grade, **Native Windows** self-hosted financial intelligence command center. It operates via a **Resilient Intelligence Mesh** that automatically orchestrates between **NVIDIA NIM**, OpenAI, Anthropic, and Groq to deliver high-fidelity market synthesis.
 
 ![Build-100%](https://img.shields.io/badge/Build-100%25_Compliant-cyan?style=for-the-badge)
 ![NVIDIA-NIM-Optimized](https://img.shields.io/badge/Engine-NVIDIA_NIM_Optimized-76b900?style=for-the-badge)
+![Mesh-Active](https://img.shields.io/badge/Mesh-Multi--Provider_Active-blue?style=for-the-badge)
 
 ---
 
-## 📑 Table of Contents
-1.  [The Sovereign Workflow (Process Map)](#-the-sovereign-workflow)
-2.  [Core Capabilities](#-core-capabilities)
-    *   [NVIDIA NIM & Multi-LLM Orchestration](#nvidia-nim--multi-llm-orchestration)
-    *   [Global Titan Sentinel](#global-titan-sentinel)
-    *   [Semantic Kernel Memory](#semantic-kernel-memory)
-3.  [Technical Specification](#-technical-specification)
-4.  [Installation & Setup](#-installation--setup)
-5.  [Usage Guide](#-usage-guide)
-6.  [Data Strategy](#-data-strategy)
-
----
-
-## 🔄 The Sovereign Workflow
-How FinIntel Pro processes intelligence in real-time:
+## 🔄 The Sovereign Mesh Workflow
+How FinIntel Pro manages intelligence across multiple providers:
 
 ```mermaid
 graph TD
-    A[User Request / Sentinel Trigger] --> B{LLM Orchestrator}
-    B -->|Selection| C[NVIDIA NIM / OpenAI / Anthropic]
-    C --> D[Real-Time Research Engine]
-    D --> E[Multi-Source Scraper: DDG/YF/Twitter]
-    E --> F[Weighted Synthesis Logic]
-    F --> G[Mega Strategic Report]
-    G --> H[Dashboard / Desktop Notification]
+    A[User Request / Sentinel Trigger] --> B{Intelligence Mesh}
+    B -->|Attempt 1: Primary| C[NVIDIA NIM / Selected]
+    C -->|Failure/Rate Limit| D[Auto-Retry x3]
+    D -->|Persistent Failure| E[Hot-Swap: Mesh Node 2]
+    E -->|Success| F[Elite Source Scraper]
+    F --> G[Weighted Synthesis Logic]
+    G --> H[Dashboard / Notification]
     H --> I[Semantic Memory Update]
     I -->|Learn| B
 ```
@@ -43,35 +28,32 @@ graph TD
 
 ## 🛡️ Core Capabilities
 
-### NVIDIA NIM & Multi-LLM Orchestration
-FinIntel Pro is built to leverage the **NVIDIA NIM** (Microservices) architecture for the fastest possible inference. 
-- **Low Latency:** Optimized for high-frequency market analysis.
-- **Provider Choice:** Swap between NVIDIA NIM, OpenAI, Anthropic, or Groq in real-time via the settings panel.
-- **AES-256 Vault:** All API keys are encrypted locally; your intelligence remains sovereign.
+### 1. Sovereign Intelligence Mesh
+- **Auto-Fallback:** If your primary API fails, the system automatically swaps to the next node in the mesh (e.g., NVIDIA -> OpenAI -> Anthropic -> Groq).
+- **Triple-Retry Logic:** Built-in resilience with a 3-attempt loop for every intelligence call.
+- **Task-Based Scaling:** Automatically uses fast models for 24/7 scanning and "Heavy" models for deep strategic research.
 
-### Global Titan Sentinel (Domestic & International)
-The background kernel operates every 15 minutes to track:
-- **Domestic Bulls:** Vijay Kedia, Ashish Kacholia, Mukul Agrawal.
-- **Global Titans:** Elon Musk, Michael Saylor, Cathie Wood, Jensen Huang.
-- **Predictive Scans:** Searching for "Upcoming Announcements" and "Secret Statements" to notify you before the market moves.
+### 2. Elite Source Matrix (50 Domains)
+The kernel is hardcoded to prioritize research from the top 50 financial domains in the Indian and Global markets, including:
+- **Domestic:** Moneycontrol, Zerodha Pulse, LiveMint, NSE/BSE Official.
+- **Global:** MicroStrategy (Saylor), Ark Invest (Wood), NVIDIA (Huang), Elon Musk.
+- **Sentiment:** Elite blog threads and expert-level social pulse.
 
-### Semantic Kernel Memory
-- **Learning Engine:** Remembers your risk profile and asset preferences across sessions.
-- **Pruning Logic:** Automatically distills chat history into semantic summaries to maintain a **10MB footprint**.
+### 3. High-Fidelity Charting Engine
+- **Multi-View:** Instantly swap between **Candle**, **Line**, and **Area** graphs.
+- **Technical Overlays:** Integrated Moving Averages (MA) and Relative Strength Index (RSI) for professional trend analysis.
+
+### 4. Semantic Kernel Memory
+- **10MB Footprint:** Automatically distills chat history into semantic summaries.
+- **Privacy:** All keys are protected by **AES-256** local encryption; no keys ever leave your machine.
 
 ---
 
-## 🏗️ Technical Specification
-
-### Database Schema (SQLite)
-- `chat_history`: Persistent logs for the Advisor.
-- `semantic_memory`: Distilled user preferences.
-- `research_history`: Archives of all "Mega Reports."
-- `saved_opportunities`: The "Sovereign Vault" for pinned picks.
-
-### Security
-- **Local-Only:** No research data or keys ever leave your machine except via direct LLM API calls.
-- **Encryption:** AES-256 (Fernet) protection for all sensitive credentials.
+## 📂 Project Structure
+- `/backend`: FastAPI Resilient Kernel & Mesh Orchestrator.
+- `/src`: React + Vite + Tailwind glassmorphism interface.
+- `run.py`: The Self-Healing Launch Orchestrator.
+- `DATA_SOURCES.md`: Rationale for the 50-source matrix.
 
 ---
 
@@ -79,7 +61,7 @@ The background kernel operates every 15 minutes to track:
 
 ### 1. Prerequisites
 - Python 3.10+ | Node.js 18+
-- API Key (NVIDIA NIM, OpenAI, or Anthropic)
+- API Keys for Mesh Nodes (NVIDIA, OpenAI, etc.)
 
 ### 2. Automated Install
 1. **CD into the Root Directory:**
@@ -92,7 +74,7 @@ The background kernel operates every 15 minutes to track:
    ```
 
 ### 3. Global Command
-Once installed, launch from **any terminal window** on your system:
+Launch from **any terminal window**:
 ```bash
 finintel
 ```
@@ -103,4 +85,4 @@ finintel
 **FinIntel Pro** is a **research and insight tool**. It is not a SEBI-registered investment advisor. All trades are at the user's own risk.
 
 ---
-**Build 1.0.0 | Hardened Sovereign Deployment**
+**Build 1.1.0 | Invincible Intelligence Mesh**
