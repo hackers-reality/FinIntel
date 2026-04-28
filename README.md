@@ -1,7 +1,7 @@
 # 🛡️ Sovereign Intelligence Nexus (v2.4)
 ### *Strategic Command Center for Elite Indian Retail Traders*
 
-> **Status:** Gold Master Candidate | **Build:** v2.4 | **System:** Sovereign Intelligence Nexus
+> **Status:** Gold Master Candidate | **Build:** v2.3 | **System:** Sovereign Intelligence Nexus
 
 The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence engine engineered to provide retail traders with institutional-grade edge. It synthesizes real-time market pulse, forensic document analysis, and institutional whale-tracking into a strictly utilitarian, zero-distraction tactical environment.
 
@@ -43,10 +43,9 @@ To fully ignite the Nexus, populate your `.env` file or the **Strategic Vault** 
 ## ⚡ Zerodha Tactical Integration
 
 ### Phase 1: Portal Deployment
-1. **Navigate to the Portal:** Open the [Kite Connect Developer Portal](https://kite.trade/).
+1. **Navigate to the Portal:** Open the [Kite Connect App Dashboard](https://kite.trade/apps).
 2. **Authentication:** Log in (or create a developer account).
 3. **App Creation:** 
-   - Click on the **"My Apps"** tab in the top navigation bar.
    - Click the **"Create New App"** button (Top Right).
    - **App Name:** `Sovereign Nexus`
    - **Redirect URL:** `http://127.0.0.1` (Crucial: Must match exactly).
