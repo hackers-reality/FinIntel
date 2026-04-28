@@ -35,10 +35,10 @@ graph TD
 
 ## 📜 Table of Contents
 1. [Core Features](#-core-features)
-2. [Strategic Components](#-strategic-components)
+2. [Project Structure](#-project-structure)
 3. [Tactical Installation](#-tactical-installation)
 4. [Docker Orchestration](#-docker-orchestration)
-5. [API Forensic Guide](#-api-forensic-guide)
+5. [API Forensic Deep-Dive](#-api-forensic-deep-dive)
 6. [Tactical Operations](#-tactical-operations)
 7. [System Hardening](#-system-hardening)
 
@@ -51,6 +51,27 @@ graph TD
 - **Whale Trade Sentinel:** Automated tracking of institutional whale activity via the Strategic Mesh.
 - **Native OS Alerts:** High-priority Windows toast notifications for VIX spikes and Whale detections.
 - **Nexus Command Palette:** `Cmd+K` tactical interface for instant system-wide navigation.
+
+---
+
+## 📂 Project Structure
+
+```text
+Sovereign-Intelligence-Nexus/
+├── backend/
+│   ├── main.py            # The Intelligence Kernel (FastAPI)
+│   ├── system.log         # Structured JSON Decisions
+│   └── Dockerfile         # Kernel Container Blueprint
+├── src/
+│   ├── components/
+│   │   └── Dashboard.tsx  # The Tactical Interface (React)
+│   └── main.tsx           # PWA Registration Layer
+├── finintel.db            # The Sovereign Database (SQLite)
+├── secret.key             # AES-256 Vault Key
+├── docker-compose.yml     # Nexus Stack Orchestration
+├── install.ps1            # Automated Tactical Installer
+└── README.md              # The Strategic Dossier
+```
 
 ---
 
@@ -69,7 +90,7 @@ graph TD
    ZERODHA_ACCESS_TOKEN=your_token
    OPENAI_API_KEY=your_key
    ```
-4. **Ignition:** Execute `finintel` in your terminal.
+4. **Ignition:** Execute `.\finintel.ps1` in your terminal.
 
 ---
 
@@ -82,20 +103,19 @@ The Nexus is fully containerized for secure, isolated deployment.
 docker-compose up --build -d
 ```
 
-### Volume Mapping
-- `./backend:/app`: Persists the Intelligence Kernel.
-- `./finintel.db:/app/finintel.db`: Persists your portfolio and chat history.
-
 ---
 
-## 📡 API Forensic Guide
+## 📡 API Forensic Deep-Dive
 
-| Provider | Purpose | Data Depth |
+| Provider | Purpose | Strategic Weight |
 | :--- | :--- | :--- |
-| **KiteConnect** | Primary Brokerage | Live Holdings, PnL, Order Book |
-| **OpenAI** | Reasoning Mesh | Forensic Analysis, Strategic Verdicts |
-| **Elite Mesh** | High-Authority Data | Moneycontrol, Livemint, SEBI Filings |
-| **yfinance** | Market Pulse | Indices, VIX, Forex, Sentiment |
+| **KiteConnect** | Primary Brokerage | **100%** (Live Capital/PnL) |
+| **OpenAI GPT-4o**| Reasoning Mesh | **High** (Forensic Verdicts) |
+| **Elite Mesh** | Authority Data | **80%** (MC, Mint, SEBI) |
+| **yfinance** | Market Pulse | **60%** (Global Indices) |
+
+### Elite Domain Mesh Logic
+The Nexus research engine utilizes a specialized `site:` filter mesh targeting only high-authority domains. This filters out 99% of internet noise, ensuring your strategic research is based on confirmed institutional reports and regulatory filings.
 
 ---
 
@@ -107,14 +127,10 @@ docker-compose up --build -d
 - **`T`**: Toggle **Terminal Mode** (High-Contrast Monospace).
 - **`Esc`**: Close palette or modals.
 
-### Forensic Filing Scan
-Paste the text of any regulatory filing into the **Nexus > Filing Analyzer**. The engine will extract hidden Risk Clauses and Regulatory Red Flags.
-
 ---
 
 ## 🔒 System Hardening
 - **AES-256 Encryption:** All API keys are encrypted at rest using Fernet.
-- **Structured Logging:** All intelligence decisions are logged in `system.log` as JSON.
 - **Local-First Privacy:** No data ever leaves your machine except for direct API calls to your configured providers.
 
 ---

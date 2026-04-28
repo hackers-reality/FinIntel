@@ -1,38 +1,17 @@
-# FinIntel Pro Installer
-Write-Host "Installing FinIntel Pro Dependencies..." -ForegroundColor Cyan
+# Sovereign Intelligence Nexus Installer
+Write-Host "🛡️ Initiating Nexus Installation..." -ForegroundColor Cyan
 
-# 1. Install Python deps
-Write-Host "Setting up Python backend..." -ForegroundColor Yellow
-pip install fastapi uvicorn yfinance duckduckgo-search python-dotenv openai anthropic requests plyer cryptography apscheduler
+# 1. Python Dependencies
+Write-Host "📦 Installing Kernel Dependencies..." -ForegroundColor Gray
+pip install kiteconnect pytz requests yfinance fastapi uvicorn duckduckgo_search openai cryptography winotify slowapi
 
-# 2. Install Node deps
-Write-Host "Setting up React frontend..." -ForegroundColor Yellow
-if (Test-Path "node_modules") {
-    Write-Host "Cleaning up old node_modules..." -ForegroundColor Gray
-    Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
-}
-if (Test-Path "package-lock.json") {
-    Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
-}
+# 2. Node Dependencies
+Write-Host "📦 Installing Interface Dependencies..." -ForegroundColor Gray
 npm install
-npm install lucide-react@latest
 
-# 3. Add to User PATH for global access
-$CurrentDir = Get-Location
-Write-Host "Adding $CurrentDir to User PATH..." -ForegroundColor Yellow
+# 3. Global Command Registration
+Write-Host "📜 Registering 'finintel' Tactical Command..." -ForegroundColor Gray
+$command = "python $(Get-Location)\backend\main.py"
+Set-Content -Path "finintel.ps1" -Value $command
 
-$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($UserPath -notlike "*$CurrentDir*") {
-    $NewPath = "$UserPath;$CurrentDir"
-    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
-    Write-Host "PATH updated successfully." -ForegroundColor Green
-} else {
-    Write-Host "Directory already in PATH." -ForegroundColor Gray
-}
-
-# 4. Create 'finintel.cmd' for global execution
-$BatchContent = "@echo off`npython `"$CurrentDir\run.py`" %*"
-Set-Content -Path "$CurrentDir\finintel.cmd" -Value $BatchContent
-
-Write-Host "`nInstallation Complete!" -ForegroundColor Green
-Write-Host "RESTART your terminal (close and reopen) to use 'finintel' anywhere." -ForegroundColor Cyan
+Write-Host "✅ Nexus Installation Complete. Run '.\finintel.ps1' to ignite." -ForegroundColor Green
