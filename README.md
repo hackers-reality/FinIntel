@@ -37,7 +37,10 @@ To activate the live portfolio and institutional data stream, follow these steps
 - Create an account and log in.
 - **Create a New App:** Provide a name and set the **Redirect URL** to `http://127.0.0.1`. 
   > [!IMPORTANT]
-  > Ensure this matches your Kite Dashboard *exactly*. If you use `http://localhost` in the dashboard, you must use it in your mental flow as well.
+  > Ensure this matches your Kite Dashboard *exactly*.
+- **Postback URL:** Leave this **BLANK**. 
+  > [!NOTE]
+  > The Postback URL is used for server-side order updates. Since the Nexus is a local-first research engine, this is not required and will not work without a public tunnel (ngrok).
 
 ### 2. Manual Access Token Generation
 Zerodha requires a fresh `access_token` daily. Follow this flow to generate it:
