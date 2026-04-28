@@ -73,6 +73,7 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS research_history (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT, analysis TEXT, score INTEGER, timestamp DATETIME)''')
         c.execute('''CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY AUTOINCREMENT, asset TEXT, event_type TEXT, message TEXT, timestamp DATETIME)''')
         c.execute('''CREATE TABLE IF NOT EXISTS price_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT, target REAL, condition TEXT, active INTEGER)''')
+        c.execute('''CREATE TABLE IF NOT EXISTS saved_opportunities (id INTEGER PRIMARY KEY AUTOINCREMENT, ticker TEXT, verdict TEXT, score INTEGER, timestamp DATETIME)''')
 
 # ── Cache Engine ──────────────────────────────────────────────────────
 class SmartCache:
@@ -475,6 +476,42 @@ async def get_logs():
     if not os.path.exists(LOG_PATH): return []
     with open(LOG_PATH, "r") as f: lines = f.readlines()
     return lines[-50:]
+
+@app.get("/market/history")
+async def get_research_history():
+    with db_session() as c:
+        c.execute("SELECT ticker, analysis, score, timestamp FROM research_history ORDER BY timestamp DESC LIMIT 20")
+        rows = c.fetchall()
+    return [{"ticker": r[0], "analysis": json.loads(r[1]), "score": r[2], "time": r[3]} for r in rows]
+
+@app.post("/market/saved")
+async def save_opportunity(data: Dict[str, Any]):
+    ticker, verdict, score = data.get("ticker"), data.get("verdict"), data.get("score")
+    with db_session() as c:
+        c.execute("INSERT INTO saved_opportunities (ticker, verdict, score, timestamp) VALUES (?, ?, ?, ?)", (ticker, verdict, score, datetime.now()))
+    return {"status": "success"}
+
+@app.get("/market/saved")
+async def get_saved():
+    with db_session() as c:
+        c.execute("SELECT id, ticker, verdict, score, timestamp FROM saved_opportunities ORDER BY timestamp DESC")
+        rows = c.fetchall()
+    return [{"id": r[0], "ticker": r[1], "verdict": r[2], "score": r[3], "time": r[4]} for r in rows]
+
+@app.delete("/system/memory")
+async def wipe_memory():
+    with db_session() as c:
+        c.execute("DELETE FROM chat_history")
+        c.execute("DELETE FROM semantic_memory")
+    log_system("KERNEL MEMORY PURGED BY USER.")
+    return {"status": "success", "message": "Semantic and Chat memory purged."}
+
+@app.get("/system/memory")
+async def get_memory_stats():
+    with db_session() as c:
+        c.execute("SELECT summary, timestamp FROM semantic_memory ORDER BY timestamp DESC")
+        mems = c.fetchall()
+    return [{"summary": r[0], "time": r[1]} for r in mems]
 
 init_db()
 if __name__ == "__main__":
