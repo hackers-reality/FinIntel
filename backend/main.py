@@ -145,7 +145,7 @@ def load_settings():
 
 settings = load_settings()
 
-# ── Background Engine ────────────────────────────────────────────────
+# ── Background Sentinel Monitor (MEGA PROJECT UPGRADE) ────────────────
 def check_market_events():
     threshold = settings.get("alert_threshold", 1.5)
     favs = settings.get("favorites", ["^NSEI"])
@@ -188,8 +188,55 @@ def check_market_events():
                 if notification: notification.notify(title=f"FinIntel: {ticker}", message=msg)
         except Exception as e: log_system(f"Monitor error for {ticker}: {e}")
 
+async def autonomous_sentinel_news():
+    """Autonomous Intelligence Scraper for Mega Events (Elon, Crypto, Huge Drops)"""
+    log_system("Sentinel Scanning for World Events...")
+    try:
+        with DDGS() as ddgs:
+            queries = [
+                "Elon Musk financial announcement today",
+                "breaking stock market crash news",
+                "new cryptocurrency launch trend",
+                "yahoo finance major earnings surprise",
+                "NIFTY 50 huge drop increase expert blogs"
+            ]
+            raw_news = []
+            for q in queries:
+                raw_news.extend(list(ddgs.text(q, max_results=3)))
+            
+            snippets = [f"{r.get('title')}: {r.get('body')}" for r in raw_news]
+            prompt = f"Analyze these headlines for CRITICAL market-moving events. If something huge is happening (Elon, Crash, New Gem), return a JSON with 'critical': true, 'event': 'Short Title', 'summary': '1 sentence', 'tickers': [potential tickers]. If nothing critical, return 'critical': false. News: {' '.join(snippets[:10])}"
+            
+            res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
+            analysis = json.loads(res)
+            
+            if analysis.get("critical"):
+                event = analysis.get("event")
+                msg = analysis.get("summary")
+                log_system(f"🚨 SENTINEL ALERT: {event}")
+                
+                with db_session() as c:
+                    c.execute("INSERT INTO notifications (asset, event_type, message, timestamp) VALUES (?, ?, ?, ?)",
+                              ("WORLD", event, msg, datetime.now().isoformat()))
+                
+                if notification:
+                    notification.notify(title=f"FinIntel MEGA: {event}", message=msg, app_name="FinIntel Pro")
+                
+                # Auto-trigger Deep Research for tickers found
+                for ticker in analysis.get("tickers", []):
+                    log_system(f"Auto-triggering research for {ticker}...")
+                    asyncio.create_task(deep_research(ticker))
+    except Exception as e:
+        log_system(f"Sentinel News Error: {e}")
+
+def run_sentinel_loop():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(autonomous_sentinel_news())
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(check_market_events, 'interval', minutes=5)
+scheduler.add_job(run_sentinel_loop, 'interval', minutes=15) # Scan news every 15 mins
 scheduler.start()
 
 @app.on_event("shutdown")
@@ -316,19 +363,55 @@ async def get_chart(ticker: str, interval: str = "1h"):
 
 @app.get("/market/research/{ticker}")
 async def deep_research(ticker: str):
+    """MEGA PROJECT RESEARCH: Deep dives into socials, Yahoo Finance, and news to find Moats, Financials, and Timing."""
     sym = f"{ticker}.NS" if "." not in ticker and not ticker.startswith("^") else ticker
     try:
         def ddg_search(q):
-            with DDGS() as ddgs: return [r.get('body', '') for r in ddgs.text(q, max_results=3)]
+            with DDGS() as ddgs: return [r.get('body', '') for r in ddgs.text(q, max_results=5)]
+        
         t1_info = await asyncio.to_thread(lambda: yf.Ticker(sym).info)
-        t2_news, t3_social = await asyncio.gather(asyncio.to_thread(ddg_search, f"{ticker} stock expert analysis news"), asyncio.to_thread(ddg_search, f"{ticker} stock sentiment reddit twitter"))
+        t2_news, t3_social, t4_finance = await asyncio.gather(
+            asyncio.to_thread(ddg_search, f"{ticker} stock expert analysis news 2024"),
+            asyncio.to_thread(ddg_search, f"{ticker} stock reddit twitter sentiment"),
+            asyncio.to_thread(ddg_search, f"{ticker} company financial health investments where they invest")
+        )
+        
+        lang = settings.get("language", "English")
         risk = settings.get("risk_profile", "Moderate")
-        prompt = f"Strategic Report for {ticker} in {lang} for a {risk} investor. T1: {t1_info.get('longBusinessSummary','')} | T2: {' '.join(t2_news)} | T3: {' '.join(t3_social)}. Return JSON: {{ 'Score': 0-100, 'Verdict': 'BUY/SELL/HOLD', 'Summary': '2 sentences in {lang}', 'Risks': [], 'Moat_Score': 0-10, 'Target_Price': 'Expected 12m' }}"
+        
+        prompt = f"""
+        Execute MEGA RESEARCH for {ticker} ({lang}).
+        Risk Profile: {risk}.
+        Data Sources:
+        - Info: {t1_info.get('longBusinessSummary','')}
+        - News: {' '.join(t2_news)}
+        - Socials: {' '.join(t3_social)}
+        - Financials: {' '.join(t4_finance)}
+        
+        Return JSON EXACTLY: 
+        {{
+          'Score': 0-100,
+          'Verdict': 'BUY/SELL/HOLD',
+          'Summary': 'Detailed 3-sentence summary',
+          'Investment_Rationale': 'Why or why not?',
+          'Strategy': 'LONG-TERM or SHORT-TERM and why',
+          'Company_Size': 'Market cap description',
+          'Asset_Allocation': 'Where do they invest? how do they grow?',
+          'Risks': ['Risk 1', 'Risk 2'],
+          'Moat_Score': 0-10,
+          'Target_Price': 'Expected 12m'
+        }}
+        """
         res = await call_llm([{"role": "user", "content": prompt}], json_mode=True)
         parsed = json.loads(res)
-        with db_session() as c: c.execute("INSERT INTO research_history (ticker, analysis, score, timestamp) VALUES (?, ?, ?, ?)", (ticker, res, parsed.get("Score", 0), datetime.now()))
+        
+        with db_session() as c: 
+            c.execute("INSERT INTO research_history (ticker, analysis, score, timestamp) VALUES (?, ?, ?, ?)", (ticker, res, parsed.get("Score", 0), datetime.now()))
+        
         return {"ticker": ticker, "analysis": parsed}
-    except Exception as e: return {"error": str(e)}
+    except Exception as e:
+        log_system(f"Deep Research Error for {ticker}: {e}")
+        return {"error": str(e)}
 
 @app.post("/chat")
 async def chat_advisor(data: Dict[str, str]):
