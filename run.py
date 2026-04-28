@@ -43,6 +43,9 @@ def run():
 
     # Start Frontend Interface
     print("🖥️  Booting Strategic Interface...")
+    if not os.path.exists(os.path.join(base_dir, "node_modules")):
+        print("📦 node_modules missing. Restoring dependencies...")
+        subprocess.run(["npm", "install"], cwd=base_dir, shell=True)
     frontend_proc = subprocess.Popen(["npm", "run", "dev"], cwd=base_dir, shell=True)
 
     print("⏳ Synchronizing services...")
