@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [data, setData] = useState<any>(null);
   const [portfolio, setPortfolio] = useState<any>({ holdings: [] });
   const [activeConfig, setActiveConfig] = useState({ provider: 'nvidia', model: 'meta/llama-3.1-405b-instruct' });
+  const [marketStatus, setMarketStatus] = useState('CLOSED');
 
   // Settings State
   const [vault, setVault] = useState<any>({});
@@ -31,16 +32,24 @@ export default function Dashboard() {
 
   const fetchInit = async () => {
     try {
-      const [oRes, pRes] = await Promise.all([
-        fetch('http://localhost:8008/market/overview'),
-        fetch('http://localhost:8008/market/portfolio/summary')
-      ]);
-      setData(await oRes.json());
+      const oRes = await fetch('http://localhost:8008/market/overview');
+      const oData = await oRes.json();
+      setData(oData);
+      setMarketStatus(oData.market_status);
+      const pRes = await fetch('http://localhost:8008/market/portfolio/summary');
       setPortfolio(await pRes.json());
     } catch {}
   };
 
-  useEffect(() => { fetchInit(); }, []);
+  useEffect(() => { 
+    fetchInit(); 
+    const ws = new WebSocket('ws://localhost:8008/ws/prices');
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.Stocks) setData(msg);
+    };
+    return () => ws.close();
+  }, []);
 
   const saveToVault = async (key: string, value: string) => {
     await fetch('http://localhost:8008/settings/vault', {
@@ -77,9 +86,14 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-cyan-400 selection:text-black">
       <nav className="fixed top-0 inset-x-0 h-20 bg-black/40 backdrop-blur-2xl border-b border-white/5 z-50 flex items-center justify-between px-10">
-        <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 bg-cyan-400 rounded-xl flex items-center justify-center text-black shadow-lg shadow-cyan-400/20"><Shield size={24} /></div>
-          <h1 className="text-lg font-black tracking-tighter uppercase italic">Sovereign Nexus</h1>
+        <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 bg-cyan-400 rounded-xl flex items-center justify-center text-black shadow-lg shadow-cyan-400/20"><Shield size={24} /></div>
+            <h1 className="text-lg font-black tracking-tighter uppercase italic">Sovereign Nexus</h1>
+          </div>
+          <div className={cn("px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest", marketStatus === 'OPEN' ? "border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_rgba(52,211,153,0.1)]" : "border-rose-400/30 text-rose-400 bg-rose-400/5")}>
+             Market {marketStatus}
+          </div>
         </div>
         <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
           {['overview', 'portfolio', 'research', 'settings'].map(t => (
@@ -92,7 +106,8 @@ export default function Dashboard() {
         {activeTab === 'overview' && (
            <div className="grid grid-cols-4 gap-6">
               {data?.Stocks?.map((s: any) => (
-                <div key={s.symbol} className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem]">
+                <div key={s.symbol} className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity"><Activity size={14} className="text-cyan-400"/></div>
                    <p className="text-[10px] font-black text-gray-500 uppercase mb-2">{s.symbol}</p>
                    <p className="text-3xl font-black">₹{s.price.toLocaleString()}</p>
                    <p className={cn("text-[10px] font-black mt-2", s.change > 0 ? "text-emerald-400" : "text-rose-400")}>{s.change.toFixed(2)}%</p>
@@ -103,7 +118,6 @@ export default function Dashboard() {
 
         {activeTab === 'settings' && (
            <div className="grid grid-cols-2 gap-8">
-              {/* Zerodha Card */}
               <div className="col-span-2 p-10 bg-white/5 border border-white/10 rounded-[3rem] space-y-6">
                  <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
@@ -119,7 +133,6 @@ export default function Dashboard() {
                  </div>
               </div>
 
-              {/* Intelligence Cards */}
               {PROVIDERS.map(p => (
                 <div key={p.id} className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] space-y-6 relative overflow-hidden">
                    <div className="flex items-center justify-between">

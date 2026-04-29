@@ -90,39 +90,46 @@ def db_session():
     try: yield conn.cursor()
     finally: conn.commit(); conn.close()
 
-# ── Universal Intelligence Mesh ──────────────────────────────────────
+# ── Intelligence Multi-Mesh (NVIDIA > Groq > OpenAI) ─────
 async def call_llm(messages, json_mode=False):
-    with db_session() as c:
-        c.execute("SELECT key, value FROM settings WHERE key IN ('active_provider', 'active_model')")
-        config = {r[0]: decrypt_v(r[1]) for r in c.fetchall()}
-        provider = config.get('active_provider', 'nvidia')
-        model = config.get('active_model', 'meta/llama-3.1-405b-instruct')
-        
-        c.execute(f"SELECT value FROM settings WHERE key='{provider}_api_key'")
-        res = c.fetchone()
-        api_key = decrypt_v(res[0]) if res else os.getenv(f"{provider.upper()}_API_KEY")
+    keys = {"nv": os.getenv("NVIDIA_API_KEY"), "gr": os.getenv("GROQ_API_KEY"), "oa": os.getenv("OPENAI_API_KEY")}
+    if keys["nv"]:
+        try:
+            client = openai.AsyncOpenAI(api_key=keys["nv"], base_url="https://integrate.api.nvidia.com/v1")
+            resp = await client.chat.completions.create(model="meta/llama-3.1-405b-instruct", messages=messages, response_format={"type": "json_object"} if json_mode else None)
+            return resp.choices[0].message.content
+        except: pass
+    if keys["oa"]:
+        try:
+            client = openai.AsyncOpenAI(api_key=keys["oa"])
+            resp = await client.chat.completions.create(model="gpt-4o", messages=messages, response_format={"type": "json_object"} if json_mode else None)
+            return resp.choices[0].message.content
+        except: pass
+    return "{}"
 
-    if not api_key: return "{}"
+# ── Market Clock ──────────────────────────────────────────────────────
+def is_market_open():
+    now = datetime.now(IST)
+    if now.weekday() >= 5: return False
+    return dtime(9, 15) <= now.time() <= dtime(15, 30)
 
-    try:
-        base_urls = {
-            "nvidia": "https://integrate.api.nvidia.com/v1",
-            "groq": "https://api.groq.com/openai/v1",
-            "openrouter": "https://openrouter.ai/api/v1",
-            "openai": "https://api.openai.com/v1"
-        }
-        
-        client = openai.AsyncOpenAI(api_key=api_key, base_url=base_urls.get(provider))
-        resp = await client.chat.completions.create(
-            model=model, 
-            messages=messages, 
-            response_format={"type": "json_object"} if json_mode else None
-        )
-        return resp.choices[0].message.content
-    except Exception as e:
-        return f"Error: {str(e)}"
+# ── WebSocket Manager ────────────────────────────────────────────────
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try: await connection.send_text(message)
+            except: pass
 
-# ── Zerodha Autonomous Auth ──────────────────────────────────────────
+manager = ConnectionManager()
+
+# ── Zerodha & Core Endpoints ─────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -132,27 +139,64 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
 
+@app.websocket("/ws/prices")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            if is_market_open():
+                tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "RELIANCE.NS", "HDFCBANK.NS"]
+                prices = []
+                for t in tickers:
+                    try:
+                        h = yf.Ticker(t).history(period="1d")
+                        if not h.empty:
+                            c, o = h['Close'].iloc[-1], h['Open'].iloc[0]
+                            prices.append({"symbol": t, "price": round(c, 2), "change": round(((c-o)/o)*100, 2)})
+                    except: pass
+                await websocket.send_text(json.dumps({"Stocks": prices}))
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+@app.get("/market/overview")
+async def market_overview():
+    tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "USDINR=X"]
+    res = []
+    for t in tickers:
+        try:
+            h = yf.Ticker(t).history(period="1d")
+            if not h.empty:
+                c, o = h['Close'].iloc[-1], h['Open'].iloc[0]
+                res.append({"symbol": t, "price": c, "change": ((c-o)/o)*100})
+        except: pass
+    sectors = []
+    for s, idx in {"Bank": "^CNXBANK", "IT": "^CNXIT", "Auto": "^CNXAUTO"}.items():
+        try:
+            h = yf.Ticker(idx).history(period="1d")
+            if not h.empty: sectors.append({"name": s, "sentiment": round(((h['Close'].iloc[-1]-h['Open'].iloc[0])/h['Open'].iloc[0])*100, 2)})
+        except: pass
+    return {"Stocks": res, "categories": sectors, "market_status": "OPEN" if is_market_open() else "CLOSED"}
+
+@app.get("/market/research/{ticker}/export")
+async def export_research(ticker: str):
+    t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
+    info = t.info
+    pdf = FPDF()
+    pdf.add_page(); pdf.set_font("Arial", 'B', 16)
+    pdf.cell(40, 10, f"Sovereign Intelligence Nexus: {ticker}"); pdf.ln(10)
+    pdf.set_font("Arial", size=12); pdf.cell(40, 10, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"); pdf.ln(10)
+    pdf.multi_cell(0, 10, f"Market Cap: {info.get('marketCap')}\nSector: {info.get('sector')}\nPrice: {info.get('currentPrice')}\n\nStrategic Summary:\n{info.get('longBusinessSummary')[:1000]}...")
+    path = os.path.join(BASE_DIR, f"{ticker}_report.pdf")
+    pdf.output(path)
+    return FileResponse(path, filename=f"{ticker}_Nexus_Report.pdf")
+
 @app.post("/settings/vault")
 async def vault_settings(data: Dict):
     with db_session() as c:
         for k, v in data.items():
             c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
     return {"status": "success"}
-
-@app.get("/settings/verify/{provider}")
-async def verify_key(provider: str, key: str):
-    try:
-        base_urls = {
-            "nvidia": "https://integrate.api.nvidia.com/v1",
-            "groq": "https://api.groq.com/openai/v1",
-            "openrouter": "https://openrouter.ai/api/v1",
-            "openai": "https://api.openai.com/v1"
-        }
-        client = openai.OpenAI(api_key=key, base_url=base_urls.get(provider))
-        client.models.list()
-        return {"status": "valid"}
-    except:
-        return {"status": "invalid"}
 
 @app.post("/market/zerodha/auth")
 async def autonomous_auth():
@@ -180,38 +224,6 @@ async def autonomous_auth():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/market/overview")
-async def market_overview():
-    tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "USDINR=X"]
-    res = []
-    for t in tickers:
-        try:
-            h = yf.Ticker(t).history(period="1d")
-            if not h.empty:
-                c, o = h['Close'].iloc[-1], h['Open'].iloc[0]
-                res.append({"symbol": t, "price": c, "change": ((c-o)/o)*100})
-        except: pass
-    sectors = []
-    for s, idx in {"Bank": "^CNXBANK", "IT": "^CNXIT", "Auto": "^CNXAUTO"}.items():
-        try:
-            h = yf.Ticker(idx).history(period="1d")
-            if not h.empty: sectors.append({"name": s, "sentiment": round(((h['Close'].iloc[-1]-h['Open'].iloc[0])/h['Open'].iloc[0])*100, 2)})
-        except: pass
-    return {"Stocks": res, "categories": sectors, "market_status": "OPEN" if is_market_open() else "CLOSED"}
-
-@app.get("/market/research/{ticker}")
-@limiter.limit("10/hour")
-async def deep_research(ticker: str, request: Request):
-    t = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS")
-    info = t.info
-    domain_query = " OR ".join([f"site:{d}" for d in ELITE_DOMAINS])
-    search_query = f"({ticker} stock news OR filing) ({domain_query})"
-    with DDGS() as ddgs: news = str(list(ddgs.text(search_query, max_results=5)))
-    prompt = [{"role": "system", "content": "Return JSON with EXACT keys: Score, Verdict, Summary, Investment_Rationale, Strategy, Risks, Target_Price, Moat_Score."},
-              {"role": "user", "content": f"Ticker: {ticker}. Data: {info}. News Mesh: {news}"}]
-    res = await call_llm(prompt, json_mode=True)
-    return json.loads(res)
-
 def sentinel_sync_loop():
     while True:
         try:
@@ -222,13 +234,6 @@ def sentinel_sync_loop():
                     send_toast("⚠️ VOLATILITY SPIKE", f"India VIX is at {round(vix['Close'].iloc[-1], 2)}. Reduce positions.")
                     with db_session() as c:
                         c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("VIX", "CRITICAL", "VOLATILITY SPIKE", now.isoformat()))
-            if now.hour == 18 and now.minute <= 15:
-                with DDGS() as ddgs:
-                    news = list(ddgs.text("NSE India FII DII flow today net", max_results=1))
-                    if news:
-                        send_toast("📡 INSTITUTIONAL FLOW", "New FII/DII data available.")
-                        with db_session() as c:
-                            c.execute("INSERT INTO notifications (asset, type, msg, ts) VALUES (?, ?, ?, ?)", ("MARKET", "FII_DII", news[0]['body'][:200], now.isoformat()))
             time.sleep(900)
         except: time.sleep(60)
 

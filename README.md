@@ -1,110 +1,47 @@
-# 🛡️ Sovereign Intelligence Nexus (v2.6)
+# 🛡️ Sovereign Intelligence Nexus (v2.7)
 ### *Strategic Command Center for Elite Indian Retail Traders*
 
-> **Status:** Gold Master | **Build:** v2.6 | **System:** Sovereign Intelligence Nexus
+> **Status:** Gold Master | **Build:** v2.7 | **System:** Sovereign Intelligence Nexus
 
 The Sovereign Intelligence Nexus is a high-fidelity, local-first intelligence engine engineered to provide retail traders with institutional-grade edge. It synthesizes real-time market pulse, forensic document analysis, and institutional whale-tracking into a strictly utilitarian, zero-distraction tactical environment.
 
 ---
 
-## 🗺️ System Architecture (The Nexus Map)
+## 🛡️ Core Strategic Features
 
-```mermaid
-graph TD
-    subgraph "Universal Intelligence Multiverse"
-        A[Zerodha KiteConnect] -->|Live Holdings/Positions| E[Intelligence Kernel]
-        B[yfinance] -->|Indices/VIX/Forex| E
-        C[Elite Domain Mesh] -->|High-Authority Research| E
-        D1[NVIDIA NIM Mesh] -->|Alpha Synthesis| E
-        D2[Groq Cloud Mesh] -->|Ultra-Fast Reasoning| E
-        D3[OpenRouter Mesh] -->|Future-Class Models| E
-    end
-
-    subgraph "Intelligence Kernel (Python/FastAPI)"
-        E -->|WebSocket Pulse| F[Tactical Interface]
-        E -->|SQLite Sync| G[(Nexus DB)]
-        E -->|Sentinel Loop| H[Native Toast Alerts]
-        E -->|Autonomous Auth| I[Zero-Touch Kernel]
-    end
-
-    subgraph "Tactical Interface (React/Vite)"
-        F -->|Filing Forensics| J[Risk Analysis]
-        F -->|Strategic Vault| K[Multiverse Settings]
-        F -->|Cmd+K Palette| L[Action Nerve Center]
-    end
-```
+- **Live WebSocket Pulse:** Real-time tactical price streaming for watchlists and portfolio holdings.
+- **Market Status Sentinel:** Dynamic detection and display of IST market hours (OPEN/CLOSED) in the tactical interface.
+- **Intelligence Multiverse:** Decentralized support for NVIDIA NIM, Groq, OpenRouter, and OpenAI. Switch intelligence tiers in real-time.
+- **Zero-Touch Zerodha Auth:** Autonomous daily session synchronization using headless TOTP 2FA.
+- **Elite Domain Mesh:** A specialized forensic search engine weighting intelligence from high-authority finance domains.
+- **Forensic Filing Engine:** LLM-powered scanning of regulatory documents for "fine print" risks.
+- **Institutional Whale Sentinel:** Automated tracking of high-conviction institutional buying/selling activity.
 
 ---
 
-## 🛡️ Core Strategic Features
+## ⚡ Zerodha Tactical Integration
 
-- **Intelligence Multiverse:** Decentralized support for NVIDIA NIM, Groq, OpenRouter, and OpenAI. Switch intelligence tiers in real-time based on cost, speed, or power requirements.
-- **Zero-Touch Zerodha Auth:** Autonomous daily session synchronization. The system performs headless logins, generates TOTP tokens, and establishes the KiteConnect stream without user intervention.
-- **Elite Domain Mesh:** A specialized forensic search engine that weights intelligence from high-authority finance domains (Moneycontrol, SEBI, NSE) while filtering out retail "noise."
-- **Forensic Filing Engine:** Specialized LLM-powered scanning of regulatory filings, court cases, and corporate announcements to identify hidden risks and "fine print" liabilities.
-- **Sentinel Sync Loop:** Background monitoring of India VIX (>20 alert), FII/DII net flows, and global market direction (Gift Nifty) to provide a 360-degree tactical overview.
-- **Global Tactical Command:** Once installed, the `finintel` command is available from any directory on your machine.
+### Option A: Zero-Touch Auth (Recommended)
+1. **Vault Your Credentials:** Navigate to the **Settings** tab in the Nexus Interface.
+2. **Inject Strategic Data:** Enter your Zerodha ID, Password, TOTP Secret, API Key, and API Secret.
+3. **Ignite Sync:** Click **"Ignite Nexus Sync"**. The Nexus handles the 2FA and session autonomously.
+
+### Option B: Manual Handshake (Fallback)
+1. **Login URL:** Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
+2. **Extract Token:** Copy the `request_token=XXXXX` string from the URL bar of the redirected page.
+   - > [!IMPORTANT]
+   - > **Don't Worry:** The browser WILL show a "Site can't be reached" error. This is **NORMAL**.
 
 ---
 
 ## 🛠️ Tactical Installation Guide
 
 ### Windows (Native Deployment)
-1. **Provisioning:** Install Python 3.10+ and Node.js 20+.
-2. **Nexus Installation:**
+1. **Ignite Installer:**
    ```powershell
-   # Run the institutional installer to provision dependencies and register the global command
    .\install.ps1
    ```
-   > [!IMPORTANT]
-   > After running the installer, **RESTART your terminal** to initialize the global `finintel` path.
-
-3. **Nexus Ignition:**
-   ```powershell
-   # Type this from ANY directory to ignite the Nexus
-   finintel
-   ```
-
----
-
-## 🔑 The Sovereign Key Vault
-
-To ignite the Nexus, populate your `.env` file or the **Strategic Vault** UI with these tactical keys:
-
-| Category | Tactical Key | Priority | Purpose |
-| :--- | :--- | :--- | :--- |
-| **Broker** | `ZERODHA_API_KEY` | **Mandatory** | Primary Market Data & Trade Stream |
-| **Broker** | `ZERODHA_API_SECRET`| **Mandatory** | Secure Session & Handshake Generation |
-| **Broker** | `ZERODHA_USER_ID` | **Recommended**| Required for Zero-Touch Autonomous Sync |
-| **Broker** | `ZERODHA_PASSWORD` | **Recommended**| Encrypted at rest for Autonomous Login |
-| **Broker** | `ZERODHA_TOTP_SECRET`| **Recommended**| Used by the pyotp kernel for 2FA bypass |
-| **Intelligence**| `NVIDIA_API_KEY` | **Priority 1** | Free Institutional Reasoning (Llama 405B) |
-| **Intelligence**| `GROQ_API_KEY` | **Priority 2** | Ultra-High Speed Strategic Reasoning |
-| **Intelligence**| `OPENROUTER_API_KEY`| **Priority 3** | Access to Future-Grade Models (GPT-5.5) |
-
----
-
-## ⚡ Zerodha Tactical Deployment
-
-### Phase 1: Portal Configuration
-1. **Developer Portal:** Navigate to [https://kite.trade/apps](https://kite.trade/apps).
-2. **App Creation:** Click **"Create New App"** (Top Right).
-3. **The Client ID:** You will be asked for your **Zerodha Client ID**. 
-   - **Discovery:** Open [Kite Web](https://kite.zerodha.com/), click on your Profile (Bottom Left). Your ID (e.g., `AB1234`) is under your name.
-4. **Redirect URL:** Set exactly to `http://127.0.0.1`.
-5. **Key Extraction:** Once created, click the app to find your **API Key** and **API Secret**.
-
-### Phase 2: Authentication Handshake
-
-#### Option A: Zero-Touch Auth (Automated)
-1. Navigate to the **Settings** tab in the Nexus UI.
-2. Enter your Client ID, Password, and TOTP Secret.
-3. Click **"Ignite Nexus Sync"**. The Nexus autonomously performs the login and session synchronization.
-
-#### Option B: Manual Handshake (Fallback)
-1. Open `https://kite.zerodha.com/connect/login?v=3&api_key=YOUR_API_KEY`.
-2. **Don't Worry:** Upon login, the browser WILL show a "Site can't be reached" error. **This is expected behavior.**
-3. Copy the `request_token=XXXXX` string from the URL bar of that "broken" page.
+2. **Launch Nexus:** Execute `finintel` (global command) or `python run.py`.
 
 ---
 
@@ -117,4 +54,4 @@ To ignite the Nexus, populate your `.env` file or the **Strategic Vault** UI wit
 
 ---
 **Status: Sovereign & Invincible.**
-*Global Tactical Command Synchronized.*
+*Powered by the v2.7 Multi-Mesh Kernel.*
