@@ -189,11 +189,11 @@ async def analyze_document(data: Dict):
     res_str = await call_llm(prompt, json_mode=True)
     return json.loads(res_str)
 
-# ── Institutional Feeds ────────────────────────────────────────────
+# ── Institutional Feeds (Refined for Final Dash) ───────────────────
 @app.get("/market/traders/news")
 async def titan_news():
     with db_session() as c:
-        c.execute("SELECT titan, title, url, ts FROM titan_news ORDER BY ts DESC LIMIT 10")
+        c.execute("SELECT titan, title, url, ts FROM titan_news ORDER BY ts DESC LIMIT 15")
         return [{"titan": r[0], "title": r[1], "url": r[2], "date": r[3]} for r in c.fetchall()]
 
 @app.get("/market/fiidii")
@@ -215,11 +215,12 @@ async def vault_settings(data: Dict):
         for k, v in data.items(): c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
     return {"status": "success"}
 
-# ── Sentinel Sync Loop ──────────────────────────────────────────────
+# ── Sentinel Sync Loop (Hardened for X/Twitter & Blogs) ───────────
 async def forensic_institutional_parse(type: str, text: str):
     prompts = {
-        "fiidii": "Extract FII and DII net cash market flow from the news. Return JSON: {'fii': float, 'dii': float}. Use 0 if not found.",
-        "bulk": "Extract Bulk/Block deal details from the news. Return JSON list of deals: [{'ticker': str, 'client': str, 'qty': float, 'price': float, 'type': str}]. Return empty list if none."
+        "fiidii": "Extract FII and DII net cash market flow. Return JSON: {'fii': float, 'dii': float}. Use 0 if not found.",
+        "bulk": "Extract Bulk deals. Return JSON list: [{'ticker': str, 'client': str, 'qty': float, 'price': float, 'type': str}].",
+        "titan": "Analyze social/blog text for Titan investment signals. Return JSON list: [{'title': str, 'url': str}]."
     }
     prompt = [{"role": "system", "content": prompts[type]}, {"role": "user", "content": f"Text: {text}"}]
     res = await call_llm(prompt, json_mode=True)
@@ -231,29 +232,22 @@ def sentinel_sync_loop():
         try:
             now = datetime.now(IST)
             with DDGS() as ddgs:
-                # 1. Titan News
+                # 1. Titan Sentinel (Hardened for X & Blogs)
                 for t in TITANS:
-                    res = list(ddgs.text(f"{t} latest investment news", max_results=1))
-                    if res:
+                    # Explicitly target X (Twitter) and professional blogs
+                    search_str = f"({t} investment) (site:x.com OR site:twitter.com OR site:moneycontrol.com/blog OR site:valueresearchonline.com)"
+                    res = list(ddgs.text(search_str, max_results=2))
+                    for r in res:
                         with db_session() as c:
-                            c.execute("INSERT OR IGNORE INTO titan_news (titan, title, url, ts) VALUES (?, ?, ?, ?)", (t, res[0]['title'], res[0]['href'], now.isoformat()))
+                            c.execute("INSERT OR IGNORE INTO titan_news (titan, title, url, ts) VALUES (?, ?, ?, ?)", (t, r['title'], r['href'], now.isoformat()))
                 
-                # 2. FII/DII Scrape & Parse
-                res = list(ddgs.text("NSE FII DII cash market net flow today moneycontrol", max_results=1))
+                # 2. FII/DII Scrape
+                res = list(ddgs.text("NSE FII DII cash flow moneycontrol today", max_results=1))
                 if res:
                     flow = asyncio.run(forensic_institutional_parse("fiidii", res[0]['body']))
                     if flow.get('fii') or flow.get('dii'):
                         with db_session() as c:
                             c.execute("INSERT OR IGNORE INTO fii_dii_flow (date, fii_net, dii_net) VALUES (?, ?, ?)", (now.date().isoformat(), flow['fii'], flow['dii']))
-                
-                # 3. Bulk Deal Scrape & Parse
-                res = list(ddgs.text("NSE bulk block deals moneycontrol today", max_results=1))
-                if res:
-                    deals = asyncio.run(forensic_institutional_parse("bulk", res[0]['body']))
-                    with db_session() as c:
-                        for d in deals:
-                            c.execute("INSERT INTO bulk_deals (ticker, client, qty, price, type, ts) VALUES (?, ?, ?, ?, ?, ?)", 
-                                      (d['ticker'], d['client'], d['qty'], d['price'], d['type'], now.isoformat()))
             time.sleep(3600)
         except: time.sleep(300)
 
