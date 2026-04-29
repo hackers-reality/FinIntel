@@ -25,6 +25,7 @@ FinIntel is an Indian market intelligence platform for portfolio monitoring, sec
 - Broker credentials are not collected or persisted in the application UI
 - Provider keys should be supplied through environment variables or an external secret manager
 - Zerodha integration, when enabled, is read-only portfolio intelligence only; FinIntel does not place, modify, or cancel orders
+- Interactive broker credentials such as request-token exchange secrets are intentionally unsupported in the application
 - Protected write routes require a signed session token issued by the backend
 - The product includes investment-risk, privacy, and terms disclosures
 - The app is an informational research tool, not a brokerage or personalized advisory service
@@ -59,6 +60,7 @@ Use `.env.example` as the baseline. Important variables:
 - `FININTEL_ENABLE_BROKER_READONLY`
 - `ZERODHA_API_KEY`
 - `ZERODHA_ACCESS_TOKEN`
+- `ZERODHA_API_SECRET` and `ZERODHA_REQUEST_TOKEN` should remain unset for this product because interactive trading-oriented broker flows are blocked
 
 ## Project layout
 
@@ -86,6 +88,7 @@ src/
 - Backend compile check: `python -m compileall backend`
 - Backend tests: `python -m unittest backend.tests.test_app`
 - CI workflow: [`.github/workflows/ci.yml`](/E:/finintel-pro/.github/workflows/ci.yml)
+- API readiness probe: `GET /ready`
 
 ## Known limits
 

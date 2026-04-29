@@ -17,7 +17,7 @@ from backend.api.portfolio import router as portfolio_router
 from backend.api.research import router as research_router
 from backend.api.settings import router as settings_router
 from backend.config.settings import get_settings
-from backend.database.db import init_db
+from backend.database.db import get_connection, init_db
 from backend.middleware.rate_limit import limiter
 
 
@@ -66,5 +66,14 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def healthcheck() -> dict[str, str]:
         return {"status": "ok", "version": settings.app_version, "environment": settings.environment}
+
+    @app.get("/ready")
+    def readiness() -> dict[str, str]:
+        connection = get_connection()
+        try:
+            connection.execute("SELECT 1")
+        finally:
+            connection.close()
+        return {"status": "ready"}
 
     return app

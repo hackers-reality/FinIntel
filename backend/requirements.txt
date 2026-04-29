@@ -3,13 +3,7 @@ uvicorn
 yfinance
 duckduckgo_search
 python-dotenv
-openai
 cryptography
 kiteconnect
-winotify
-fpdf
-pyotp
 slowapi
-websockets
 pytz
-requests

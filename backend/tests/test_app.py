@@ -31,6 +31,11 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
 
+    def test_readiness(self) -> None:
+        response = self.client.get("/ready")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ready")
+
     def test_portfolio_requires_session(self) -> None:
         response = self.client.post("/market/portfolio/holdings", json={"ticker": "INFY", "qty": 1, "price": 100})
         self.assertEqual(response.status_code, 401)
@@ -53,6 +58,25 @@ class AppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["mode"], "read-only")
         self.assertEqual(response.headers["X-Process-Time-Ms"] != "", True)
+
+    def test_broker_account_blocks_interactive_credentials(self) -> None:
+        original_enable = os.environ.get("FININTEL_ENABLE_BROKER_READONLY")
+        original_secret = os.environ.get("ZERODHA_API_SECRET")
+        try:
+            os.environ["FININTEL_ENABLE_BROKER_READONLY"] = "true"
+            os.environ["ZERODHA_API_SECRET"] = "blocked-secret"
+            response = self.client.get("/market/broker/account", headers={"X-Session-Token": self.session_token})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["status"], "blocked")
+        finally:
+            if original_enable is None:
+                os.environ.pop("FININTEL_ENABLE_BROKER_READONLY", None)
+            else:
+                os.environ["FININTEL_ENABLE_BROKER_READONLY"] = original_enable
+            if original_secret is None:
+                os.environ.pop("ZERODHA_API_SECRET", None)
+            else:
+                os.environ["ZERODHA_API_SECRET"] = original_secret
 
     @patch("backend.services.research_service._search_sources")
     def test_company_due_diligence_endpoint(self, mock_search_sources) -> None:

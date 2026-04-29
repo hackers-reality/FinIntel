@@ -5,7 +5,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -30,6 +30,16 @@ class AppSettings(BaseModel):
     )
     request_rate_limit: str = Field(default_factory=lambda: os.getenv("FININTEL_RATE_LIMIT", "60/minute"))
     session_ttl_minutes: int = Field(default_factory=lambda: int(os.getenv("FININTEL_SESSION_TTL_MINUTES", "480")))
+    enable_broker_readonly: bool = Field(default_factory=lambda: os.getenv("FININTEL_ENABLE_BROKER_READONLY", "false").lower() == "true")
+
+    @model_validator(mode="after")
+    def validate_security_posture(self) -> "AppSettings":
+        if self.environment.lower() in {"production", "prod"}:
+            if not self.app_secret or len(self.app_secret) < 32:
+                raise ValueError("FININTEL_APP_SECRET must be set to a strong value in production.")
+            if "*" in self.allowed_origins:
+                raise ValueError("Wildcard CORS origins are not allowed in production.")
+        return self
 
 
 @lru_cache(maxsize=1)

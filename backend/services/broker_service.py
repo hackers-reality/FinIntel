@@ -24,6 +24,15 @@ def get_broker_account_summary() -> BrokerAccountSummary:
 
     api_key = os.getenv("ZERODHA_API_KEY", "").strip()
     access_token = os.getenv("ZERODHA_ACCESS_TOKEN", "").strip()
+    api_secret = os.getenv("ZERODHA_API_SECRET", "").strip()
+    request_token = os.getenv("ZERODHA_REQUEST_TOKEN", "").strip()
+    if api_secret or request_token:
+        return BrokerAccountSummary(
+            provider="zerodha",
+            status="blocked",
+            mode=READ_ONLY_MODE,
+            message="Interactive broker credentials are blocked. Only read-only access-token based account intelligence is permitted.",
+        )
     if not api_key or not access_token or KiteConnect is None:
         return BrokerAccountSummary(
             provider="zerodha",
