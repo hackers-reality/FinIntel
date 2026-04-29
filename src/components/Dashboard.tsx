@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Search, History, Cpu, BarChart3, TrendingUp, TrendingDown, 
-  Zap, Clock, Activity, Wallet, FileText, AlertCircle, List, Terminal, Command, CheckCircle2, Settings as SettingsIcon, Key, Globe, BrainCircuit, ExternalLink, Plus
+  Zap, Clock, Activity, Wallet, FileText, AlertCircle, List, Terminal, Command, CheckCircle2, Settings as SettingsIcon, Key, Globe, BrainCircuit, ExternalLink, Plus, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -22,7 +22,7 @@ export default function Dashboard() {
   const [portfolio, setPortfolio] = useState<any>({ total_value: 0, holdings: [] });
   const [researchResult, setResearchResult] = useState<any>(null);
   const [titanNews, setTitanNews] = useState<any[]>([]);
-  const [fiidii, setFiidii] = useState<any[]>([]);
+  const [bulkDeals, setBulkDeals] = useState<any[]>([]);
   const [activeConfig, setActiveConfig] = useState({ provider: 'nvidia', model: 'meta/llama-3.1-405b-instruct' });
   const [marketStatus, setMarketStatus] = useState('CLOSED');
 
@@ -38,18 +38,18 @@ export default function Dashboard() {
 
   const fetchInit = async () => {
     try {
-      const [oRes, pRes, nRes, fRes] = await Promise.all([
+      const [oRes, pRes, nRes, bRes] = await Promise.all([
         fetch('http://localhost:8008/market/overview'),
         fetch('http://localhost:8008/market/portfolio/summary'),
         fetch('http://localhost:8008/market/traders/news'),
-        fetch('http://localhost:8008/market/fiidii')
+        fetch('http://localhost:8008/market/bulkdeals')
       ]);
       const oData = await oRes.json();
       setData(oData);
       setMarketStatus(oData.market_status);
       setPortfolio(await pRes.json());
       setTitanNews(await nRes.json());
-      setFiidii(await fRes.json());
+      setBulkDeals(await bRes.json());
     } catch {}
   };
 
@@ -98,14 +98,6 @@ export default function Dashboard() {
     setVerifyStatus({ ...verifyStatus, [provider]: status });
   };
 
-  const setModel = async (provider: string, model: string) => {
-    await fetch('http://localhost:8008/settings/vault', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ active_provider: provider, active_model: model })
-    });
-    setActiveConfig({ provider, model });
-  };
-
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-cyan-400 selection:text-black">
       <nav className="fixed top-0 inset-x-0 h-20 bg-black/40 backdrop-blur-2xl border-b border-white/5 z-50 flex items-center justify-between px-10">
@@ -141,27 +133,29 @@ export default function Dashboard() {
               
               <div className="grid grid-cols-3 gap-8">
                  <div className="col-span-2 space-y-4">
-                    <h2 className="text-xs font-black uppercase text-gray-500 px-4">Titan Whale Feed</h2>
-                    {titanNews.map((n, i) => (
-                      <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-3xl flex items-center justify-between group hover:bg-white/10 transition-all">
-                         <div className="pr-10">
-                            <p className="text-[10px] font-black text-cyan-400 uppercase mb-1">{n.titan}</p>
-                            <h3 className="text-sm font-bold leading-tight">{n.title}</h3>
+                    <h2 className="text-xs font-black uppercase text-gray-500 px-4">Whale Command: Bulk & Block Deals</h2>
+                    <div className="p-8 bg-white/5 border border-white/10 rounded-[3rem] space-y-6">
+                       {bulkDeals.map((b, i) => (
+                         <div key={i} className="flex items-center justify-between border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                            <div>
+                               <p className="text-[10px] font-black text-cyan-400 uppercase">{b.ticker}</p>
+                               <h3 className="text-sm font-bold text-gray-300">{b.client}</h3>
+                            </div>
+                            <div className="text-right">
+                               <p className={cn("text-[10px] font-black uppercase", b.type === 'BUY' ? "text-emerald-400" : "text-rose-400")}>{b.type} @ ₹{b.price}</p>
+                               <p className="text-[10px] font-black text-gray-500 uppercase">{b.qty.toLocaleString()} SHARES</p>
+                            </div>
                          </div>
-                         <a href={n.url} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0"><ExternalLink size={16}/></a>
-                      </div>
-                    ))}
+                       ))}
+                    </div>
                  </div>
                  <div className="space-y-4">
-                    <h2 className="text-xs font-black uppercase text-gray-500 px-4">Institutional Flow (FII/DII)</h2>
-                    <div className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] space-y-6">
-                       {fiidii.map((f, i) => (
-                         <div key={i} className="flex items-center justify-between">
-                            <p className="text-[10px] font-black uppercase text-gray-500">{f.date}</p>
-                            <div className="flex space-x-4">
-                               <p className={cn("text-[10px] font-black", f.fii > 0 ? "text-emerald-400" : "text-rose-400")}>FII: {f.fii.toFixed(0)}Cr</p>
-                               <p className={cn("text-[10px] font-black", f.dii > 0 ? "text-emerald-400" : "text-rose-400")}>DII: {f.dii.toFixed(0)}Cr</p>
-                            </div>
+                    <h2 className="text-xs font-black uppercase text-gray-500 px-4">Titan Portfolios</h2>
+                    <div className="space-y-4">
+                       {titanNews.map((n, i) => (
+                         <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all cursor-pointer">
+                            <p className="text-[10px] font-black text-cyan-400 uppercase mb-1">{n.titan}</p>
+                            <h3 className="text-xs font-bold leading-tight line-clamp-2">{n.title}</h3>
                          </div>
                        ))}
                     </div>
