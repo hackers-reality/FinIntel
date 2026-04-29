@@ -151,15 +151,7 @@ async def behavior_analysis(ticker: str):
     res = await call_llm(prompt, json_mode=True)
     return json.loads(res)
 
-# ── Event Tracker Registry ─────────────────────────────────────────
-@app.get("/market/events")
-async def get_all_pending_events():
-    with db_session() as c:
-        c.execute("SELECT * FROM pending_events WHERE status='pending'")
-        rows = c.fetchall()
-        return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "ts": r[4], "status": r[5]} for r in rows]
-
-# ── Portfolio & Fine Print ─────────────────────────────────────────
+# ── Portfolio & Fine Print Logic ───────────────────────────────────
 @app.post("/market/portfolio/holdings")
 async def update_portfolio(data: Dict):
     with db_session() as c:
@@ -189,38 +181,18 @@ async def analyze_document(data: Dict):
     res_str = await call_llm(prompt, json_mode=True)
     return json.loads(res_str)
 
-# ── Institutional Feeds (Refined for Final Dash) ───────────────────
-@app.get("/market/traders/news")
-async def titan_news():
-    with db_session() as c:
-        c.execute("SELECT titan, title, url, ts FROM titan_news ORDER BY ts DESC LIMIT 15")
-        return [{"titan": r[0], "title": r[1], "url": r[2], "date": r[3]} for r in c.fetchall()]
-
-@app.get("/market/fiidii")
-async def fii_dii_data():
-    with db_session() as c:
-        c.execute("SELECT date, fii_net, dii_net FROM fii_dii_flow ORDER BY date DESC LIMIT 10")
-        return [{"date": r[0], "fii": r[1], "dii": r[2]} for r in c.fetchall()]
-
-@app.get("/market/bulkdeals")
-async def bulk_deals():
-    with db_session() as c:
-        c.execute("SELECT ticker, client, qty, price, type, ts FROM bulk_deals ORDER BY ts DESC LIMIT 10")
-        return [{"ticker": r[0], "client": r[1], "qty": r[2], "price": r[3], "type": r[4], "date": r[5]} for r in c.fetchall()]
-
-# ── Settings & Vault ───────────────────────────────────────────────
+# ── Settings & Auth ────────────────────────────────────────────────
 @app.post("/settings/vault")
 async def vault_settings(data: Dict):
     with db_session() as c:
         for k, v in data.items(): c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
     return {"status": "success"}
 
-# ── Sentinel Sync Loop (Hardened for X/Twitter & Blogs) ───────────
+# ── Sentinel Sync Loop (Absolute Hardened Logic) ──────────────────
 async def forensic_institutional_parse(type: str, text: str):
     prompts = {
-        "fiidii": "Extract FII and DII net cash market flow. Return JSON: {'fii': float, 'dii': float}. Use 0 if not found.",
-        "bulk": "Extract Bulk deals. Return JSON list: [{'ticker': str, 'client': str, 'qty': float, 'price': float, 'type': str}].",
-        "titan": "Analyze social/blog text for Titan investment signals. Return JSON list: [{'title': str, 'url': str}]."
+        "fiidii": "Extract FII and DII net cash market flow. Return JSON: {'fii': float, 'dii': float}.",
+        "bulk": "Extract Bulk deals. Return JSON list: [{'ticker': str, 'client': str, 'qty': float, 'price': float, 'type': str}]."
     }
     prompt = [{"role": "system", "content": prompts[type]}, {"role": "user", "content": f"Text: {text}"}]
     res = await call_llm(prompt, json_mode=True)
@@ -231,17 +203,24 @@ def sentinel_sync_loop():
     while True:
         try:
             now = datetime.now(IST)
+            
+            # 1. India VIX Sentinel (Priority Logic)
+            try:
+                vix = yf.Ticker("^INDIAVIX").history(period="1d")['Close'].iloc[-1]
+                if vix > 20:
+                    send_toast("⚠️ VOLATILITY ALERT", f"India VIX has spiked to {vix:.2f}. Exercise caution.")
+            except: pass
+
             with DDGS() as ddgs:
-                # 1. Titan Sentinel (Hardened for X & Blogs)
+                # 2. Titan News Sentinel
                 for t in TITANS:
-                    # Explicitly target X (Twitter) and professional blogs
-                    search_str = f"({t} investment) (site:x.com OR site:twitter.com OR site:moneycontrol.com/blog OR site:valueresearchonline.com)"
+                    search_str = f"({t} investment) (site:x.com OR site:moneycontrol.com)"
                     res = list(ddgs.text(search_str, max_results=2))
                     for r in res:
                         with db_session() as c:
                             c.execute("INSERT OR IGNORE INTO titan_news (titan, title, url, ts) VALUES (?, ?, ?, ?)", (t, r['title'], r['href'], now.isoformat()))
                 
-                # 2. FII/DII Scrape
+                # 3. Institutional Flow Forensics
                 res = list(ddgs.text("NSE FII DII cash flow moneycontrol today", max_results=1))
                 if res:
                     flow = asyncio.run(forensic_institutional_parse("fiidii", res[0]['body']))
