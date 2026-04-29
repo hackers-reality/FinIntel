@@ -1,10 +1,9 @@
-# FinIntel Terminal / Strategic Intelligence Nexus
-
-Institutional-grade financial intelligence terminal designed for the Indian market. Optimized for high-fidelity retail research, professional portfolio management, and strategic market forensics.
+# FinIntel Terminal: Strategic Intelligence Nexus
+> **Institutional-grade financial intelligence terminal designed for the Indian market.**
 
 ---
 
-## 🏛️ Strategic Architecture Map
+## 🏛️ Strategic Architecture
 
 ```mermaid
 graph TD
@@ -25,48 +24,114 @@ graph TD
 
 ---
 
-## ⚡ Zero-Config Ignition
+## 📑 Table of Contents
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Getting Started](#-getting-started)
+- [Configuration](#-configuration)
+- [Project Structure](#-project-structure)
+- [Security](#-security)
+- [Deployment](#-deployment)
 
-From a clean repository, run the global orchestrator to weaponize the entire terminal:
+---
 
+## 🚀 Features
+
+### 1. Market Intelligence Dashboard
+- **Institutional Whale Feed:** Real-time tracking of FII/DII net flows and Bulk/Block deals parsed via LLM.
+- **Titan Sentinel:** Intelligence extraction from X (Twitter) and professional blogs for major Indian investors.
+- **India VIX Sentinel:** Background volatility monitoring with native OS alerts for spikes above 20.
+
+### 2. Forensic Research Module
+- **Deep Ticker Analysis:** Multi-LLM reasoning (NVIDIA, Groq, OpenAI) with persistent context for evolved ticker dialogue.
+- **Fine Print Scanner:** NLP-powered forensics for regulatory filings and legal document risk detection.
+- **Behavioral Pulse:** Automated pattern detection for Accumulation and Distribution phases.
+
+### 3. Professional Portfolio Vault
+- **Real-time Asset Tracking:** Automated PnL calculation synchronized with live NSE/BSE exchange data.
+- **Sector Performance Heatmap:** Visual sectoral rotation analysis across all primary Nifty indices.
+- **Brokerage Sync:** Seamless Zerodha KiteConnect integration for live holdings retrieval.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Kernel:** Python 3.10+, FastAPI, Uvicorn, Asynchronous Tasks.
+- **Interface:** React 18, Vite, Tailwind CSS, Framer Motion.
+- **Intelligence:** NVIDIA NIM (Llama-3.1), Groq Cloud, OpenRouter, OpenAI.
+- **Data:** YFinance, DuckDuckGo Search, KiteConnect SDK.
+- **Security:** AES-256 (Fernet) Encryption, SQLite Secure Vault.
+
+---
+
+## ⚡ Getting Started
+
+### 1. Zero-Config Installation
+Clone the repository and run the global orchestrator:
 ```powershell
 ./install.ps1
 finintel
 ```
 
+### 2. Manual Setup
+If you prefer manual provisioning:
+```bash
+# Backend
+pip install -r backend/requirements.txt
+python backend/main.py
+
+# Frontend
+npm install
+npm run dev
+```
+
 ---
 
-## 🛠️ Tactical Setup & Configuration
+## ⚙️ Configuration
 
-### 1. Zerodha KiteConnect Integration
-To enable real-time portfolio sync and brokerage forensics:
-1.  **Create App:** Visit [Zerodha Developers](https://developers.kite.trade/apps).
-2.  **Redirect URL:** Set to `http://localhost:8008/market/zerodha/callback`.
-3.  **Credentials:** Obtain your **API Key** and **API Secret**.
-4.  **Client ID:** Use your standard Zerodha Client ID (found in your Kite Profile).
-5.  **TOTP:** Ensure TOTP is enabled on your Zerodha account and capture the **Secret Key** (Seed) during setup.
+### Zerodha KiteConnect
+1. Create a developer app at [Zerodha Developers](https://developers.kite.trade/apps).
+2. Set Redirect URL: `http://localhost:8008/market/zerodha/callback`.
+3. Capture your **API Key**, **API Secret**, and **Client ID**.
+4. Secure your **TOTP Seed** during your profile's 2FA setup.
 
-### 2. Multi-LLM Intelligence Mesh
-Manage these in the **Settings** tab of the terminal:
-- **NVIDIA NIM:** High-fidelity Llama-3.1 405B reasoning.
-- **Groq Cloud:** Ultra-low latency Llama-3 70B forensics.
-- **OpenRouter:** Universal access to Claude 3.5, Gemini 1.5, and GPT-4o.
-- **OpenAI:** Native GPT-4 integration.
+### Intelligence Mesh
+Configure your API keys in the **Settings** tab:
+- **NVIDIA_API_KEY:** For elite-tier Llama-3.1 405B reasoning.
+- **GROQ_API_KEY:** For ultra-fast market forensics.
+- **OPENROUTER_API_KEY:** For universal model access (Claude/Gemini).
 
-### 3. Professional Feature Set
-- **Market Intelligence:** FII/DII flow, Bulk/Block deals, and India VIX Sentinel.
-- **Sector Heatmap:** Professional top-down rotation visualization.
-- **Forensic Document Analysis:** NLP-powered scan of legal fine print and regulatory filings.
-- **Portfolio Management:** AES-256 encrypted vault with real-time PnL.
+---
+
+## 📂 Project Structure
+
+```text
+finintel-pro/
+├── backend/
+│   ├── main.py          # Intelligence Kernel
+│   ├── requirements.txt # Kernel Dependencies
+├── src/
+│   ├── components/      # Tactical Panels
+│   │   ├── OverviewPanel.tsx
+│   │   ├── SectorPanel.tsx
+│   │   ├── PortfolioPanel.tsx
+│   │   ├── ResearchPanel.tsx
+│   │   └── SettingsPanel.tsx
+│   └── App.tsx          # Interface Root
+├── install.ps1          # Global Installer
+├── run.py               # Root Orchestrator
+├── finintel.db          # Encrypted Vault
+└── secret.key           # AES-256 Master Key
+```
 
 ---
 
 ## 🛡️ Security & Compliance
-
-- **AES-256 Vault:** All credentials (API Keys, Broker secrets) are encrypted locally using Fernet (AES-256).
-- **Compliance:** Designed for personal research use. Professional TOTP flow handles Zerodha session handshakes securely.
+- **AES-256 Encryption:** All credentials are encrypted locally using the Fernet protocol.
+- **No Cloud Storage:** Your data and keys never leave your machine.
+- **Compliance:** Intended for personal research and strategic analysis.
 
 ---
 
-**Institutional Master v4.3 Build.**
+**FinIntel Terminal v4.4 Build.**
 🛡️💹
