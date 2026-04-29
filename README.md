@@ -6,27 +6,33 @@
 ## 🏛️ Strategic Architecture Map
 
 ```mermaid
-graph TD
+graph LR
+    subgraph "DATA INGESTION MESH"
+        L[Zerodha KiteConnect] --- L1[Auth & Holdings]
+        M[NSE/BSE Exchange] --- M1[Price Feeds]
+        N[LLM Mesh / NVIDIA & Groq] --- N1[Reasoning]
+        O[Open Intelligence / Web] --- O1[Sentiment]
+    end
+
     subgraph "INTELLIGENCE KERNEL (FastAPI)"
-        A[FastAPI Kernel] --> B[Institutional News Forensics]
+        L1 --> A[FastAPI Kernel]
+        M1 --> A
+        N1 --> A
+        O1 --> A
+        
+        A --> B[Institutional News Forensics]
         A --> C[VIX & Price Sentinels]
         A --> D[Portfolio & Event Vault]
         A --> E[Sectoral Performance Engine]
     end
 
     subgraph "TACTICAL INTERFACE (React/Vite)"
-        F[Global Terminal Orchestrator] --> G[Overview Module]
+        F[Global Terminal Orchestrator]
+        F --> G[Overview Module]
         F --> H[Sector Heatmap]
         F --> I[Portfolio Management]
         F --> J[Forensic Analysis Panel]
         F --> K[Credential Vault]
-    end
-
-    subgraph "DATA INGESTION MESH"
-        L[Zerodha KiteConnect] -->|Auth & Holdings| A
-        M[NSE/BSE Exchange] -->|Price Feeds| A
-        N[LLM Mesh / NVIDIA & Groq] -->|Reasoning| A
-        O[Open Intelligence / Web] -->|Sentiment| A
     end
 
     A -->|Streaming Sync| F
@@ -131,7 +137,7 @@ finintel-pro/
 ├── install.ps1          # Global Path Injector & Provisioner
 ├── run.py               # Root Strategic Orchestrator
 ├── finintel.db          # Encrypted SQLite Vault
-└── secret.key           # AES-256 Master Fernet Key
+└── secret.key           # AES-256 Master Key
 ```
 
 ---
@@ -143,5 +149,5 @@ finintel-pro/
 
 ---
 
-**FinIntel Terminal v4.6 Build.**
+**FinIntel Terminal v4.7 Build.**
 🛡️💹
