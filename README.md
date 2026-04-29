@@ -38,14 +38,14 @@ graph TD
 ## 🚀 Features
 
 ### 1. Market Intelligence Dashboard
-- **Institutional Whale Feed:** Real-time tracking of FII/DII net flows and Bulk/Block deals parsed via LLM.
-- **Titan Sentinel:** Intelligence extraction from X (Twitter) and professional blogs for major Indian investors.
-- **India VIX Sentinel:** Background volatility monitoring with native OS alerts for spikes above 20.
+- **Institutional Market Feed:** Real-time tracking of FII/DII net flows and Bulk/Block deals parsed via LLM.
+- **Strategic Titan Sentinel:** Intelligence extraction from X (Twitter) and professional blogs for major Indian investors.
+- **Volatility Sentinel:** Background monitoring with native OS alerts for spikes above 20 (India VIX).
 
 ### 2. Forensic Research Module
-- **Deep Ticker Analysis:** Multi-LLM reasoning (NVIDIA, Groq, OpenAI) with persistent context for evolved ticker dialogue.
-- **Fine Print Scanner:** NLP-powered forensics for regulatory filings and legal document risk detection.
-- **Behavioral Pulse:** Automated pattern detection for Accumulation and Distribution phases.
+- **Institutional Ticker Research:** Multi-LLM reasoning (NVIDIA, Groq, OpenAI) with persistent context for evolved ticker dialogue.
+- **Regulatory Filing Forensic:** NLP-powered scan for legal document risk detection and fine print analysis.
+- **Market Accumulation Pulse:** Automated pattern detection for Accumulation and Distribution phases.
 
 ### 3. Professional Portfolio Vault
 - **Real-time Asset Tracking:** Automated PnL calculation synchronized with live NSE/BSE exchange data.
@@ -129,9 +129,9 @@ finintel-pro/
 ## 🛡️ Security & Compliance
 - **AES-256 Encryption:** All credentials are encrypted locally using the Fernet protocol.
 - **No Cloud Storage:** Your data and keys never leave your machine.
-- **Compliance:** Intended for personal research and strategic analysis.
+- **Compliance:** Intended for professional research and strategic analysis.
 
 ---
 
-**FinIntel Terminal v4.4 Build.**
+**FinIntel Terminal v4.5 Build.**
 🛡️💹
