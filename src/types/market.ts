@@ -10,6 +10,23 @@ export interface MarketOverview {
   as_of: string
 }
 
+export interface MarketQuote {
+  symbol: string
+  name: string
+  price: number
+  change: number
+  change_percent: number
+  volume: number
+  category: 'stock' | 'currency'
+}
+
+export interface CurrencyQuote {
+  symbol: string
+  price: number
+  change: number
+  change_percent: number
+}
+
 export interface SectorData {
   sector: string
   change: number
@@ -44,4 +61,28 @@ export interface MarketEvent {
   description: string
   ts: string
   status: string
+}
+
+export interface MarketChartPoint {
+  timestamp: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export interface MarketChartSeries {
+  symbol: string
+  period: string
+  interval: string
+  points: MarketChartPoint[]
+}
+
+export interface MarketAlert {
+  symbol: string
+  title: string
+  severity: 'info' | 'medium' | 'high'
+  description: string
+  source: string
 }

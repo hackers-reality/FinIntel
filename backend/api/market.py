@@ -1,12 +1,27 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
-from backend.schemas.market import BulkDeal, FiiDiiFlow, InvestorNews, MarketEvent, MarketOverview, SectorPerformance
+from backend.schemas.market import (
+    BulkDeal,
+    CurrencyQuote,
+    FiiDiiFlow,
+    InvestorNews,
+    MarketAlert,
+    MarketChartSeries,
+    MarketEvent,
+    MarketOverview,
+    MarketQuote,
+    SectorPerformance,
+)
 from backend.services.market_service import (
     get_bulk_deals,
+    get_currency_quotes,
     get_institutional_flows,
     get_investor_news,
+    get_market_alerts,
     get_market_events,
+    get_market_chart,
     get_market_overview,
+    get_market_quotes,
     get_sector_performance,
 )
 
@@ -17,6 +32,25 @@ router = APIRouter(prefix="/market", tags=["market"])
 @router.get("/overview", response_model=MarketOverview)
 def market_overview() -> MarketOverview:
     return get_market_overview()
+
+
+@router.get("/quotes", response_model=list[MarketQuote])
+def market_quotes() -> list[MarketQuote]:
+    return get_market_quotes()
+
+
+@router.get("/currencies", response_model=list[CurrencyQuote])
+def currency_quotes() -> list[CurrencyQuote]:
+    return get_currency_quotes()
+
+
+@router.get("/chart/{symbol}", response_model=MarketChartSeries)
+def market_chart(
+    symbol: str,
+    period: str = Query(default="1mo"),
+    interval: str = Query(default="1d"),
+) -> MarketChartSeries:
+    return get_market_chart(symbol, period=period, interval=interval)
 
 
 @router.get("/sectors", response_model=list[SectorPerformance])
@@ -42,3 +76,8 @@ def bulk_deals() -> list[BulkDeal]:
 @router.get("/events", response_model=list[MarketEvent])
 def market_events() -> list[MarketEvent]:
     return get_market_events()
+
+
+@router.get("/alerts", response_model=list[MarketAlert])
+def market_alerts() -> list[MarketAlert]:
+    return get_market_alerts()

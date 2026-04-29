@@ -96,3 +96,24 @@ class AppTestCase(unittest.TestCase):
         response = self.client.get("/market/portfolio-context/INFY", headers={"X-Session-Token": self.session_token})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["ticker"], "INFY")
+
+    @patch("backend.services.settings_service.OpenAI")
+    def test_provider_settings_save_and_verify(self, mock_openai) -> None:
+        fake_models = type("Models", (), {"list": lambda self: type("ModelList", (), {"data": [1, 2, 3]})()})()
+        mock_client = type("Client", (), {"models": fake_models})()
+        mock_openai.return_value = mock_client
+
+        save_response = self.client.post(
+            "/settings/providers",
+            headers={"X-Session-Token": self.session_token},
+            json={"provider": "openai", "api_key": "sk-test-key", "base_url": None, "model": "gpt-4.1-mini"},
+        )
+        self.assertEqual(save_response.status_code, 200)
+        self.assertEqual(save_response.json()["provider"], "openai")
+
+        verify_response = self.client.post(
+            "/settings/providers/openai/verify",
+            headers={"X-Session-Token": self.session_token},
+        )
+        self.assertEqual(verify_response.status_code, 200)
+        self.assertEqual(verify_response.json()["verification_status"], "verified")

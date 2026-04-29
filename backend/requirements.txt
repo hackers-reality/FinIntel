@@ -3,6 +3,7 @@ uvicorn
 yfinance
 duckduckgo_search
 python-dotenv
+openai
 cryptography
 kiteconnect
 slowapi

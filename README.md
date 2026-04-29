@@ -1,14 +1,16 @@
 # FinIntel
 
-FinIntel is an Indian market intelligence platform for portfolio monitoring, sector analysis, ticker research, and document risk review. The current build focuses on safer defaults, stronger type safety, modular backend services, and clearer compliance language.
+FinIntel is an Indian market intelligence platform for portfolio monitoring, sector analysis, ticker research, charting, provider-key management, and document risk review. The current build focuses on safer defaults, stronger type safety, modular backend services, and clearer compliance language.
 
 ## What it does
 
 - Market overview for Nifty, Sensex, India VIX, and USD/INR
+- Market desk with equities, currencies, chart modes, alerts, and news tape
 - Sector performance heatmap for major Indian indices
 - Portfolio valuation and holding-level PnL tracking
 - Heuristic research summaries and momentum/behavior signals
 - Portfolio-aware research context using holdings, exposure, and available broker cash when read-only sync is enabled
+- LLM provider key entry and verification modal for OpenAI-compatible endpoints
 - Document clause scanning for common legal and risk keywords
 - Compliance, privacy, and risk-disclosure surfaces in the product
 
@@ -19,11 +21,13 @@ FinIntel is an Indian market intelligence platform for portfolio monitoring, sec
 - Data: Yahoo Finance market data and local application records
 - Discovery: DuckDuckGo search for legal, news, blog, and public commentary inputs
 - Session model: short-lived signed application sessions for protected write operations
+- Provider keys: encrypted local storage for development verification, with production guidance to use environment secrets or an external secret manager
 
 ## Security and compliance posture
 
 - Broker credentials are not collected or persisted in the application UI
 - Provider keys should be supplied through environment variables or an external secret manager
+- LLM provider keys can be entered and verified from the settings modal, but production should still prefer managed secrets
 - Zerodha integration, when enabled, is read-only portfolio intelligence only; FinIntel does not place, modify, or cancel orders
 - Interactive broker credentials such as request-token exchange secrets are intentionally unsupported in the application
 - Protected write routes require a signed session token issued by the backend
@@ -60,6 +64,7 @@ Use `.env.example` as the baseline. Important variables:
 - `FININTEL_ENABLE_BROKER_READONLY`
 - `ZERODHA_API_KEY`
 - `ZERODHA_ACCESS_TOKEN`
+- LLM provider settings are managed from the app modal and stored encrypted locally for development-only convenience
 - `ZERODHA_API_SECRET` and `ZERODHA_REQUEST_TOKEN` should remain unset for this product because interactive trading-oriented broker flows are blocked
 
 ## Project layout
@@ -93,6 +98,7 @@ src/
 ## Known limits
 
 - Market data quality depends on third-party sources and may be delayed
+- Real-time here means refreshed frequently from public sources; it is not a paid institutional feed
 - Research outputs are heuristic summaries, not analyst-grade recommendations
 - Company due diligence uses external search results for legal, news, blog, and public-commentary context and should be manually reviewed
 - Broker sync is read-only and intended to enrich analytics with holdings, investment value, cash, and PnL context

@@ -1,16 +1,18 @@
 import { FileText, ShieldCheck } from 'lucide-react'
 
 import type { BrokerAccountSummary } from '../types/broker'
-import type { ComplianceBundle, UserSettings } from '../types/settings'
+import type { ComplianceBundle, ProviderSettingStatus, UserSettings } from '../types/settings'
 
 interface Props {
   settings: UserSettings | null
   compliance: ComplianceBundle | null
   brokerAccount: BrokerAccountSummary | null
+  providers: ProviderSettingStatus[]
+  onManageProviders: () => void
   onAcknowledgeRisk: () => void
 }
 
-export default function SettingsPanel({ settings, compliance, brokerAccount, onAcknowledgeRisk }: Props) {
+export default function SettingsPanel({ settings, compliance, brokerAccount, providers, onManageProviders, onAcknowledgeRisk }: Props) {
   return (
     <div className="space-y-8">
       <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] space-y-8">
@@ -22,7 +24,7 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, onA
         <div className="p-6 bg-cyan-400/5 border border-cyan-400/20 rounded-2xl space-y-4">
           <p className="text-xs font-bold text-cyan-400 uppercase">Secret handling</p>
           <p className="text-[10px] text-gray-400 leading-relaxed">
-            Provider keys and broker credentials are not stored in the application UI. Configure them through environment variables or an external secret manager for production use.
+            Provider keys can be stored locally for development and verification, but production deployments should use environment variables or an external secret manager.
           </p>
           <div className="flex items-center justify-between">
             <div>
@@ -32,6 +34,32 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, onA
             <button onClick={onAcknowledgeRisk} className="px-5 py-3 rounded-2xl bg-cyan-400 text-black text-[10px] font-black uppercase">
               Acknowledge
             </button>
+          </div>
+        </div>
+
+        <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-cyan-400 uppercase">LLM providers</p>
+              <p className="text-[10px] text-gray-400 leading-relaxed">
+                Add and verify OpenAI-compatible keys from a modal rather than scattering secret inputs through the interface.
+              </p>
+            </div>
+            <button onClick={onManageProviders} className="rounded-2xl bg-cyan-300 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-black">
+              Manage Keys
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {providers.map((provider) => (
+              <div key={provider.provider} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold capitalize">{provider.provider}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">{provider.verification_status ?? 'unverified'}</p>
+                </div>
+                <p className="mt-2 text-xs text-gray-400">{provider.model ?? 'No model selected'}</p>
+                <p className="mt-1 text-[10px] text-gray-500">{provider.verification_message ?? 'No verification message yet.'}</p>
+              </div>
+            ))}
           </div>
         </div>
 

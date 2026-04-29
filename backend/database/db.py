@@ -78,6 +78,19 @@ def init_db() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS provider_settings (
+                provider TEXT PRIMARY KEY,
+                encrypted_key TEXT NOT NULL,
+                base_url TEXT,
+                model TEXT,
+                verified_at TEXT,
+                verification_status TEXT,
+                verification_message TEXT
+            )
+            """
+        )
         connection.commit()
 
 

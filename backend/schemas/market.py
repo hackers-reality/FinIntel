@@ -47,3 +47,44 @@ class InvestorNews(BaseModel):
     title: str
     url: str
     date: str
+
+
+class CurrencyQuote(BaseModel):
+    symbol: str
+    price: float
+    change: float
+    change_percent: float
+
+
+class MarketQuote(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    change: float
+    change_percent: float
+    volume: float
+    category: str
+
+
+class MarketChartPoint(BaseModel):
+    timestamp: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+class MarketChartSeries(BaseModel):
+    symbol: str
+    period: str
+    interval: str
+    points: list[MarketChartPoint]
+
+
+class MarketAlert(BaseModel):
+    symbol: str
+    title: str
+    severity: str
+    description: str
+    source: str
