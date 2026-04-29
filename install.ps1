@@ -16,5 +16,5 @@ if ($UserPath -notlike "*$InstallPath*") {
     Write-Host "ℹ️ FinIntel already in system PATH." -ForegroundColor Gray
 }
 
-Write-Host "🚀 FinIntel Terminal v3.7 Installation Complete." -ForegroundColor Green
+Write-Host "🚀 FinIntel Terminal v3.9 Installation Complete." -ForegroundColor Green
 Write-Host "🛡️ Type 'finintel' from any directory to ignite." -ForegroundColor White
