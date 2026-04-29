@@ -25,33 +25,6 @@ graph TD
 
 ---
 
-## 🚀 Professional Feature Set
-
-### 1. Market Intelligence Overview
-Real-time pulse of Nifty/Sensex, India VIX alerts (>20 threshold), and the **Institutional Whale Feed** tracking FII/DII and Bulk/Block deals parsed via LLM.
-
-### 2. Sector Performance Heatmap
-A professional top-down rotation tool visualizing relative strength across all primary Nifty sectoral indices (Bank, Auto, IT, Pharma, FMCG, Metal, Realty).
-
-### 3. Forensic Document Analysis
-Advanced NLP engine for scanning regulatory filings and legal fine print. Returns risk clauses, court case mentions, and regulatory flags with institutional precision.
-
-### 4. Professional Portfolio Management
-Secure, AES-256 encrypted vault for asset tracking. Real-time PnL calculation synchronized with live exchange data.
-
-### 5. Institutional Intelligence Mesh
-Multi-LLM reasoning engine (NVIDIA NIM, Groq, OpenAI) with persistent strategic context for evolved ticker analysis.
-
----
-
-## 🛡️ Security & Compliance
-
-- **AES-256 Vault:** All credentials (API Keys, Broker secrets) are encrypted locally using Fernet (AES-256).
-- **Environment Parity:** Supports `.env` injection for production-grade security.
-- **Broker Policy:** Designed for personal research use. Professional TOTP flow handles Zerodha session handshakes securely.
-
----
-
 ## ⚡ Zero-Config Ignition
 
 From a clean repository, run the global orchestrator to weaponize the entire terminal:
@@ -63,5 +36,37 @@ finintel
 
 ---
 
-**Institutional Master v4.2 Build.**
+## 🛠️ Tactical Setup & Configuration
+
+### 1. Zerodha KiteConnect Integration
+To enable real-time portfolio sync and brokerage forensics:
+1.  **Create App:** Visit [Zerodha Developers](https://developers.kite.trade/apps).
+2.  **Redirect URL:** Set to `http://localhost:8008/market/zerodha/callback`.
+3.  **Credentials:** Obtain your **API Key** and **API Secret**.
+4.  **Client ID:** Use your standard Zerodha Client ID (found in your Kite Profile).
+5.  **TOTP:** Ensure TOTP is enabled on your Zerodha account and capture the **Secret Key** (Seed) during setup.
+
+### 2. Multi-LLM Intelligence Mesh
+Manage these in the **Settings** tab of the terminal:
+- **NVIDIA NIM:** High-fidelity Llama-3.1 405B reasoning.
+- **Groq Cloud:** Ultra-low latency Llama-3 70B forensics.
+- **OpenRouter:** Universal access to Claude 3.5, Gemini 1.5, and GPT-4o.
+- **OpenAI:** Native GPT-4 integration.
+
+### 3. Professional Feature Set
+- **Market Intelligence:** FII/DII flow, Bulk/Block deals, and India VIX Sentinel.
+- **Sector Heatmap:** Professional top-down rotation visualization.
+- **Forensic Document Analysis:** NLP-powered scan of legal fine print and regulatory filings.
+- **Portfolio Management:** AES-256 encrypted vault with real-time PnL.
+
+---
+
+## 🛡️ Security & Compliance
+
+- **AES-256 Vault:** All credentials (API Keys, Broker secrets) are encrypted locally using Fernet (AES-256).
+- **Compliance:** Designed for personal research use. Professional TOTP flow handles Zerodha session handshakes securely.
+
+---
+
+**Institutional Master v4.3 Build.**
 🛡️💹
