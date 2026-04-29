@@ -22,7 +22,6 @@ from datetime import datetime, time as dtime, timedelta
 import openai
 from cryptography.fernet import Fernet
 from kiteconnect import KiteConnect
-import threading
 import time
 from fpdf import FPDF
 import pyotp
@@ -31,10 +30,7 @@ from urllib.parse import urlparse, parse_qs
 # ── Elite Domain Mesh ────────────────────────────────────────────────
 ELITE_DOMAINS = ["moneycontrol.com", "economictimes.indiatimes.com", "livemint.com", "business-standard.com", "nseindia.com", "bseindia.com", "sebi.gov.in"]
 TITANS = ["Vijay Kedia", "Ashish Kacholia", "Mukul Agrawal", "Rakesh Jhunjhunwala Portfolio"]
-SECTOR_INDICES = {
-    "BANK": "^CNXBANK", "AUTO": "^CNXAUTO", "IT": "^CNXIT", "PHARMA": "^CNXPHARMA",
-    "FMCG": "^CNXFMCG", "METAL": "^CNXMETAL", "REALTY": "^CNXREALTY", "ENERGY": "^CNXENERGY"
-}
+SECTOR_INDICES = {"BANK": "^CNXBANK", "AUTO": "^CNXAUTO", "IT": "^CNXIT", "PHARMA": "^CNXPHARMA", "FMCG": "^CNXFMCG", "METAL": "^CNXMETAL", "REALTY": "^CNXREALTY", "ENERGY": "^CNXENERGY"}
 
 # ── Native Windows Notifications ─────────────────────────────────────
 try:
@@ -116,11 +112,11 @@ async def call_llm(messages, json_mode=False):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    threading.Thread(target=sentinel_sync_loop, daemon=True).start()
+    asyncio.create_task(sentinel_sync_task())
     yield
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Market & Research Endpoints ─────────────────────────────────────
 @app.get("/market/overview")
@@ -148,59 +144,23 @@ async def sector_performance():
         except: pass
     return sorted(res, key=lambda x: x['change'], reverse=True)
 
-@app.get("/market/research/{ticker}")
-async def deep_research(ticker: str):
-    symbol = ticker if ".NS" in ticker else f"{ticker}.NS"
-    t = yf.Ticker(symbol)
-    info = t.info
-    domain_query = " OR ".join([f"site:{d}" for d in ELITE_DOMAINS])
-    search_query = f"({ticker} stock news OR filing) ({domain_query})"
-    with DDGS() as ddgs: news = str(list(ddgs.text(search_query, max_results=5)))
-    prompt = [{"role": "system", "content": "Return JSON with: Score (0-100), Verdict, Summary, Rationale, Strategy, Risks, Target, Moat."}, {"role": "user", "content": f"Ticker: {ticker}. Data: {info}. News: {news}"}]
-    res = await call_llm(prompt, json_mode=True)
-    return json.loads(res)
-
-@app.get("/market/behavior/{ticker}")
-async def behavior_analysis(ticker: str):
-    prompt = [{"role": "system", "content": "Analyze ticker behavior. Return JSON: status (ACCUMULATION/DISTRIBUTION), sentiment, whales_buying (boolean)."}, {"role": "user", "content": f"Ticker: {ticker}. Pattern detection."}]
-    res = await call_llm(prompt, json_mode=True)
-    return json.loads(res)
-
-# ── Portfolio & Fine Print Logic ───────────────────────────────────
-@app.get("/market/portfolio/summary")
-async def portfolio_summary():
-    with db_session() as c:
-        c.execute("SELECT ticker, qty, price FROM portfolio")
-        rows = c.fetchall()
-    total_val = 0; holdings = []
-    for r in rows:
-        ticker, qty, avg = r[0], r[1], r[2]
-        try:
-            h = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS").history(period="1d")
-            cur = h['Close'].iloc[-1] if not h.empty else avg
-        except: cur = avg
-        pnl = (cur - avg) * qty
-        total_val += (cur * qty)
-        holdings.append({"symbol": ticker, "qty": qty, "avg_price": avg, "curr_price": round(cur, 2), "pnl": round(pnl, 2)})
-    return {"total_value": round(total_val, 2), "holdings": holdings}
-
-# ── Sentinel Sync Loop (Absolute Logic) ───────────────────────────
-def sentinel_sync_loop():
+# ── Sentinel Sync Task (Native Async) ─────────────────────────────
+async def sentinel_sync_task():
     while True:
         try:
             now = datetime.now(IST)
             try:
                 vix = yf.Ticker("^INDIAVIX").history(period="1d")['Close'].iloc[-1]
-                if vix > 20: send_toast("⚠️ VOLATILITY ALERT", f"India VIX has spiked to {vix:.2f}.")
+                if vix > 20: send_toast("⚠️ VOLATILITY ALERT", f"India VIX: {vix:.2f}")
             except: pass
             with DDGS() as ddgs:
                 for t in TITANS:
-                    res = list(ddgs.text(f"({t} investment) (site:x.com OR site:moneycontrol.com)", max_results=1))
+                    res = list(ddgs.text(f"{t} investment news", max_results=1))
                     for r in res:
                         with db_session() as c:
                             c.execute("INSERT OR IGNORE INTO titan_news (titan, title, url, ts) VALUES (?, ?, ?, ?)", (t, r['title'], r['href'], now.isoformat()))
-            time.sleep(3600)
-        except: time.sleep(300)
+            await asyncio.sleep(3600)
+        except: await asyncio.sleep(300)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
