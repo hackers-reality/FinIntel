@@ -23,7 +23,6 @@ import openai
 from cryptography.fernet import Fernet
 from kiteconnect import KiteConnect
 import time
-from fpdf import FPDF
 import pyotp
 from urllib.parse import urlparse, parse_qs
 
@@ -54,7 +53,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(os.path.dirname(BASE_DIR), "finintel.db")
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), ".env"))
 IST = pytz.timezone('Asia/Kolkata')
-limiter = Limiter(key_func=get_remote_address)
 
 # ── Security & DB ─────────────────────────────────────────────────────
 def get_fernet():
@@ -118,7 +116,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ── Market & Research Endpoints ─────────────────────────────────────
+# ── Market Core Endpoints (RE-INJECTED) ─────────────────────────────
 @app.get("/market/overview")
 async def market_overview():
     tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "USDINR=X"]
@@ -144,7 +142,94 @@ async def sector_performance():
         except: pass
     return sorted(res, key=lambda x: x['change'], reverse=True)
 
-# ── Sentinel Sync Task (Native Async) ─────────────────────────────
+@app.get("/market/research/{ticker}")
+async def deep_research(ticker: str):
+    symbol = ticker if ".NS" in ticker else f"{ticker}.NS"
+    t = yf.Ticker(symbol); info = t.info
+    domain_query = " OR ".join([f"site:{d}" for d in ELITE_DOMAINS])
+    search_query = f"({ticker} stock news OR filing) ({domain_query})"
+    with DDGS() as ddgs: news = str(list(ddgs.text(search_query, max_results=5)))
+    prompt = [{"role": "system", "content": "Return JSON: Score (0-100), Verdict, Summary, Rationale, Strategy, Risks, Target, Moat."}, {"role": "user", "content": f"Ticker: {ticker}. Data: {info}. News: {news}"}]
+    res = await call_llm(prompt, json_mode=True)
+    return json.loads(res)
+
+@app.get("/market/behavior/{ticker}")
+async def behavior_analysis(ticker: str):
+    prompt = [{"role": "system", "content": "Analyze ticker behavior. Return JSON: status (ACCUMULATION/DISTRIBUTION), sentiment, whales_buying (boolean)."}, {"role": "user", "content": f"Ticker: {ticker}. Pattern detection."}]
+    res = await call_llm(prompt, json_mode=True)
+    return json.loads(res)
+
+# ── Event Tracking (RE-INJECTED) ──────────────────────────────────
+@app.get("/market/events")
+async def get_all_pending_events():
+    with db_session() as c:
+        c.execute("SELECT * FROM pending_events WHERE status='pending'")
+        rows = c.fetchall()
+        return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "ts": r[4], "status": r[5]} for r in rows]
+
+@app.post("/market/events")
+async def create_event(data: Dict):
+    with db_session() as c:
+        c.execute("INSERT INTO pending_events (ticker, type, description, ts, status) VALUES (?, ?, ?, ?, 'pending')", (data['ticker'], data['event_type'], data['description'], datetime.now().isoformat()))
+    return {"status": "success"}
+
+# ── Portfolio & Forensics (RE-INJECTED) ────────────────────────────
+@app.get("/market/portfolio/summary")
+async def portfolio_summary():
+    with db_session() as c:
+        c.execute("SELECT ticker, qty, price FROM portfolio")
+        rows = c.fetchall()
+    total_val = 0; holdings = []
+    for r in rows:
+        ticker, qty, avg = r[0], r[1], r[2]
+        try:
+            h = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS").history(period="1d")
+            cur = h['Close'].iloc[-1] if not h.empty else avg
+        except: cur = avg
+        pnl = (cur - avg) * qty
+        total_val += (cur * qty)
+        holdings.append({"symbol": ticker, "qty": qty, "avg_price": avg, "curr_price": round(cur, 2), "pnl": round(pnl, 2)})
+    return {"total_value": round(total_val, 2), "holdings": holdings}
+
+@app.post("/market/portfolio/holdings")
+async def update_portfolio(data: Dict):
+    with db_session() as c:
+        c.execute("INSERT INTO portfolio (ticker, qty, price) VALUES (?, ?, ?)", (data['ticker'], float(data['qty']), float(data['price'])))
+    return {"status": "success"}
+
+@app.post("/analyze/document")
+async def analyze_document(data: Dict):
+    prompt = [{"role": "system", "content": "Analyze document for fine print. Return JSON: risk_clauses, court_case_mentions, regulatory_flags, sentiment_verdict."}, {"role": "user", "content": data.get("text", "")}]
+    res_str = await call_llm(prompt, json_mode=True)
+    return json.loads(res_str)
+
+# ── Institutional Feeds (RE-INJECTED) ──────────────────────────────
+@app.get("/market/traders/news")
+async def titan_news():
+    with db_session() as c:
+        c.execute("SELECT titan, title, url, ts FROM titan_news ORDER BY ts DESC LIMIT 15")
+        return [{"titan": r[0], "title": r[1], "url": r[2], "date": r[3]} for r in c.fetchall()]
+
+@app.get("/market/fiidii")
+async def fii_dii_data():
+    with db_session() as c:
+        c.execute("SELECT date, fii_net, dii_net FROM fii_dii_flow ORDER BY date DESC LIMIT 10")
+        return [{"date": r[0], "fii": r[1], "dii": r[2]} for r in c.fetchall()]
+
+@app.get("/market/bulkdeals")
+async def bulk_deals():
+    with db_session() as c:
+        c.execute("SELECT ticker, client, qty, price, type, ts FROM bulk_deals ORDER BY ts DESC LIMIT 10")
+        return [{"ticker": r[0], "client": r[1], "qty": r[2], "price": r[3], "type": r[4], "date": r[5]} for r in c.fetchall()]
+
+# ── Settings & Vault ───────────────────────────────────────────────
+@app.post("/settings/vault")
+async def vault_settings(data: Dict):
+    with db_session() as c:
+        for k, v in data.items(): c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
+    return {"status": "success"}
+
+# ── Sentinel Sync Task (Absolute Resilience) ──────────────────────
 async def sentinel_sync_task():
     while True:
         try:
