@@ -31,6 +31,10 @@ from urllib.parse import urlparse, parse_qs
 # ── Elite Domain Mesh ────────────────────────────────────────────────
 ELITE_DOMAINS = ["moneycontrol.com", "economictimes.indiatimes.com", "livemint.com", "business-standard.com", "nseindia.com", "bseindia.com", "sebi.gov.in"]
 TITANS = ["Vijay Kedia", "Ashish Kacholia", "Mukul Agrawal", "Rakesh Jhunjhunwala Portfolio"]
+SECTOR_INDICES = {
+    "BANK": "^CNXBANK", "AUTO": "^CNXAUTO", "IT": "^CNXIT", "PHARMA": "^CNXPHARMA",
+    "FMCG": "^CNXFMCG", "METAL": "^CNXMETAL", "REALTY": "^CNXREALTY", "ENERGY": "^CNXENERGY"
+}
 
 # ── Native Windows Notifications ─────────────────────────────────────
 try:
@@ -42,7 +46,7 @@ except ImportError:
 def send_toast(title, msg):
     if HAS_NOTIFY:
         try:
-            toast = Notification(app_id="Sovereign Nexus", title=title, msg=msg, duration="long")
+            toast = Notification(app_id="FinIntel Terminal", title=title, msg=msg, duration="long")
             toast.show()
         except: pass
 
@@ -76,7 +80,6 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS portfolio (id INTEGER PRIMARY KEY, ticker TEXT, qty REAL, price REAL)")
         c.execute("CREATE TABLE IF NOT EXISTS chat (id INTEGER PRIMARY KEY, ticker TEXT, role TEXT, content TEXT, ts TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS notifications (id INTEGER PRIMARY KEY, asset TEXT, type TEXT, msg TEXT, ts TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS fii_dii_flow (id INTEGER PRIMARY KEY, date TEXT UNIQUE, fii_net REAL, dii_net REAL)")
         c.execute("CREATE TABLE IF NOT EXISTS titan_news (id INTEGER PRIMARY KEY, titan TEXT, title TEXT, url TEXT, ts TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS bulk_deals (id INTEGER PRIMARY KEY, ticker TEXT, client TEXT, qty REAL, price REAL, type TEXT, ts TEXT)")
@@ -133,6 +136,18 @@ async def market_overview():
         except: pass
     return {"Stocks": res, "market_status": "OPEN" if dtime(9,15) <= datetime.now(IST).time() <= dtime(15,30) else "CLOSED"}
 
+@app.get("/market/sectors")
+async def sector_performance():
+    res = []
+    for name, sym in SECTOR_INDICES.items():
+        try:
+            h = yf.Ticker(sym).history(period="1d")
+            if not h.empty:
+                c, o = h['Close'].iloc[-1], h['Open'].iloc[0]
+                res.append({"sector": name, "change": ((c-o)/o)*100})
+        except: pass
+    return sorted(res, key=lambda x: x['change'], reverse=True)
+
 @app.get("/market/research/{ticker}")
 async def deep_research(ticker: str):
     symbol = ticker if ".NS" in ticker else f"{ticker}.NS"
@@ -152,12 +167,6 @@ async def behavior_analysis(ticker: str):
     return json.loads(res)
 
 # ── Portfolio & Fine Print Logic ───────────────────────────────────
-@app.post("/market/portfolio/holdings")
-async def update_portfolio(data: Dict):
-    with db_session() as c:
-        c.execute("INSERT INTO portfolio (ticker, qty, price) VALUES (?, ?, ?)", (data['ticker'], float(data['qty']), float(data['price'])))
-    return {"status": "success"}
-
 @app.get("/market/portfolio/summary")
 async def portfolio_summary():
     with db_session() as c:
@@ -175,58 +184,21 @@ async def portfolio_summary():
         holdings.append({"symbol": ticker, "qty": qty, "avg_price": avg, "curr_price": round(cur, 2), "pnl": round(pnl, 2)})
     return {"total_value": round(total_val, 2), "holdings": holdings}
 
-@app.post("/analyze/document")
-async def analyze_document(data: Dict):
-    prompt = [{"role": "system", "content": "Analyze document for fine print. Return JSON: risk_clauses, court_case_mentions, regulatory_flags, sentiment_verdict."}, {"role": "user", "content": data.get("text", "")}]
-    res_str = await call_llm(prompt, json_mode=True)
-    return json.loads(res_str)
-
-# ── Settings & Auth ────────────────────────────────────────────────
-@app.post("/settings/vault")
-async def vault_settings(data: Dict):
-    with db_session() as c:
-        for k, v in data.items(): c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
-    return {"status": "success"}
-
-# ── Sentinel Sync Loop (Absolute Hardened Logic) ──────────────────
-async def forensic_institutional_parse(type: str, text: str):
-    prompts = {
-        "fiidii": "Extract FII and DII net cash market flow. Return JSON: {'fii': float, 'dii': float}.",
-        "bulk": "Extract Bulk deals. Return JSON list: [{'ticker': str, 'client': str, 'qty': float, 'price': float, 'type': str}]."
-    }
-    prompt = [{"role": "system", "content": prompts[type]}, {"role": "user", "content": f"Text: {text}"}]
-    res = await call_llm(prompt, json_mode=True)
-    try: return json.loads(res)
-    except: return {"fii": 0.0, "dii": 0.0} if type == "fiidii" else []
-
+# ── Sentinel Sync Loop (Absolute Logic) ───────────────────────────
 def sentinel_sync_loop():
     while True:
         try:
             now = datetime.now(IST)
-            
-            # 1. India VIX Sentinel (Priority Logic)
             try:
                 vix = yf.Ticker("^INDIAVIX").history(period="1d")['Close'].iloc[-1]
-                if vix > 20:
-                    send_toast("⚠️ VOLATILITY ALERT", f"India VIX has spiked to {vix:.2f}. Exercise caution.")
+                if vix > 20: send_toast("⚠️ VOLATILITY ALERT", f"India VIX has spiked to {vix:.2f}.")
             except: pass
-
             with DDGS() as ddgs:
-                # 2. Titan News Sentinel
                 for t in TITANS:
-                    search_str = f"({t} investment) (site:x.com OR site:moneycontrol.com)"
-                    res = list(ddgs.text(search_str, max_results=2))
+                    res = list(ddgs.text(f"({t} investment) (site:x.com OR site:moneycontrol.com)", max_results=1))
                     for r in res:
                         with db_session() as c:
                             c.execute("INSERT OR IGNORE INTO titan_news (titan, title, url, ts) VALUES (?, ?, ?, ?)", (t, r['title'], r['href'], now.isoformat()))
-                
-                # 3. Institutional Flow Forensics
-                res = list(ddgs.text("NSE FII DII cash flow moneycontrol today", max_results=1))
-                if res:
-                    flow = asyncio.run(forensic_institutional_parse("fiidii", res[0]['body']))
-                    if flow.get('fii') or flow.get('dii'):
-                        with db_session() as c:
-                            c.execute("INSERT OR IGNORE INTO fii_dii_flow (date, fii_net, dii_net) VALUES (?, ?, ?)", (now.date().isoformat(), flow['fii'], flow['dii']))
             time.sleep(3600)
         except: time.sleep(300)
 

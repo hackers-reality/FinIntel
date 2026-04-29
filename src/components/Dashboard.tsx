@@ -4,12 +4,14 @@ import OverviewPanel from './OverviewPanel';
 import PortfolioPanel from './PortfolioPanel';
 import ResearchPanel from './ResearchPanel';
 import SettingsPanel from './SettingsPanel';
+import SectorPanel from './SectorPanel';
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [data, setData] = useState<any>(null);
+  const [sectors, setSectors] = useState<any[]>([]);
   const [portfolio, setPortfolio] = useState<any>({ total_value: 0, holdings: [] });
   const [researchResult, setResearchResult] = useState<any>(null);
   const [behavior, setBehavior] = useState<any>(null);
@@ -29,14 +31,16 @@ export default function Dashboard() {
 
   const fetchInit = async () => {
     try {
-      const [oRes, pRes, nRes, eRes, fRes, bRes] = await Promise.all([
-        fetch('http://localhost:8008/market/overview'), fetch('http://localhost:8008/market/portfolio/summary'),
-        fetch('http://localhost:8008/market/traders/news'), fetch('http://localhost:8008/market/events'),
-        fetch('http://localhost:8008/market/fiidii'), fetch('http://localhost:8008/market/bulkdeals')
+      const [oRes, sRes, pRes, nRes, eRes, fRes, bRes] = await Promise.all([
+        fetch('http://localhost:8008/market/overview'), fetch('http://localhost:8008/market/sectors'),
+        fetch('http://localhost:8008/market/portfolio/summary'), fetch('http://localhost:8008/market/traders/news'),
+        fetch('http://localhost:8008/market/events'), fetch('http://localhost:8008/market/fiidii'),
+        fetch('http://localhost:8008/market/bulkdeals')
       ]);
       const oData = await oRes.json();
       setData(oData);
       setMarketStatus(oData.market_status);
+      setSectors(await sRes.json());
       setPortfolio(await pRes.json());
       setTitanNews(await nRes.json());
       setPendingEvents(await eRes.json());
@@ -45,7 +49,7 @@ export default function Dashboard() {
     } catch {}
   };
 
-  useEffect(() => { fetchInit(); const i = setInterval(fetchInit, 30000); return () => clearInterval(i); }, []);
+  useEffect(() => { fetchInit(); const i = setInterval(fetchInit, 60000); return () => clearInterval(i); }, []);
 
   const runResearch = async () => {
     if (!researchTicker) return;
@@ -88,7 +92,7 @@ export default function Dashboard() {
           <div className={cn("px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest", marketStatus === 'OPEN' ? "border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_#10b98110]" : "border-rose-400/30 text-rose-400")}>Market {marketStatus}</div>
         </div>
         <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
-          {['overview', 'portfolio', 'research', 'settings'].map(t => (
+          {['overview', 'sectors', 'portfolio', 'research', 'settings'].map(t => (
             <button key={t} onClick={() => setActiveTab(t)} className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all", activeTab === t ? "bg-white/10 text-white" : "text-gray-500")}>{t}</button>
           ))}
         </div>
@@ -96,6 +100,7 @@ export default function Dashboard() {
 
       <main className="pt-28 pb-20 px-10 max-w-7xl mx-auto">
         {activeTab === 'overview' && <OverviewPanel data={data} titanNews={titanNews} fiidii={fiidii} bulkDeals={bulkDeals} pendingEvents={pendingEvents} marketStatus={marketStatus} />}
+        {activeTab === 'sectors' && <SectorPanel sectors={sectors} />}
         {activeTab === 'portfolio' && <PortfolioPanel portfolio={portfolio} newAsset={newAsset} setNewAsset={setNewAsset} addAsset={addAsset} />}
         {activeTab === 'research' && <ResearchPanel researchTicker={researchTicker} setResearchTicker={setResearchTicker} runResearch={runResearch} isResearching={isResearching} researchResult={researchResult} behavior={behavior} docText={docText} setDocText={setDocText} analyzeDoc={analyzeDoc} isAnalyzing={isAnalyzing} docResult={docResult} />}
         {activeTab === 'settings' && <SettingsPanel saveToVault={saveToVault} />}
