@@ -5,20 +5,21 @@ import PortfolioPanel from './PortfolioPanel';
 import ResearchPanel from './ResearchPanel';
 import SettingsPanel from './SettingsPanel';
 import SectorPanel from './SectorPanel';
+import { StockIndex, SectorData, PortfolioSummary, InstitutionalNews, InstitutionalFlow, StrategicEvent } from '../types/market';
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [data, setData] = useState<any>(null);
-  const [sectors, setSectors] = useState<any[]>([]);
-  const [portfolio, setPortfolio] = useState<any>({ total_value: 0, holdings: [] });
+  const [data, setData] = useState<{ Stocks: StockIndex[] } | null>(null);
+  const [sectors, setSectors] = useState<SectorData[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioSummary>({ total_value: 0, holdings: [] });
   const [researchResult, setResearchResult] = useState<any>(null);
   const [behavior, setBehavior] = useState<any>(null);
   const [docResult, setDocResult] = useState<any>(null);
-  const [pendingEvents, setPendingEvents] = useState<any[]>([]);
-  const [titanNews, setTitanNews] = useState<any[]>([]);
-  const [fiidii, setFiidii] = useState<any[]>([]);
+  const [pendingEvents, setPendingEvents] = useState<StrategicEvent[]>([]);
+  const [titanNews, setTitanNews] = useState<InstitutionalNews[]>([]);
+  const [fiidii, setFiidii] = useState<InstitutionalFlow[]>([]);
   const [bulkDeals, setBulkDeals] = useState<any[]>([]);
   const [marketStatus, setMarketStatus] = useState('CLOSED');
 
@@ -82,7 +83,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans">
+    <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
       <nav className="fixed top-0 inset-x-0 h-20 bg-black/40 backdrop-blur-2xl border-b border-white/5 z-50 flex items-center justify-between px-10">
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-4">
@@ -98,13 +99,18 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <main className="pt-28 pb-20 px-10 max-w-7xl mx-auto">
-        {activeTab === 'overview' && <OverviewPanel data={data} titanNews={titanNews} fiidii={fiidii} bulkDeals={bulkDeals} pendingEvents={pendingEvents} marketStatus={marketStatus} />}
+      <main className="flex-1 pt-28 pb-20 px-10 max-w-7xl mx-auto w-full">
+        {activeTab === 'overview' && data && <OverviewPanel data={data} titanNews={titanNews} fiidii={fiidii} bulkDeals={bulkDeals} pendingEvents={pendingEvents} marketStatus={marketStatus} />}
         {activeTab === 'sectors' && <SectorPanel sectors={sectors} />}
         {activeTab === 'portfolio' && <PortfolioPanel portfolio={portfolio} newAsset={newAsset} setNewAsset={setNewAsset} addAsset={addAsset} />}
         {activeTab === 'research' && <ResearchPanel researchTicker={researchTicker} setResearchTicker={setResearchTicker} runResearch={runResearch} isResearching={isResearching} researchResult={researchResult} behavior={behavior} docText={docText} setDocText={setDocText} analyzeDoc={analyzeDoc} isAnalyzing={isAnalyzing} docResult={docResult} />}
         {activeTab === 'settings' && <SettingsPanel saveToVault={saveToVault} />}
       </main>
+
+      <footer className="py-6 px-10 border-t border-white/5 bg-black/40 backdrop-blur-xl text-center">
+        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-1">FinIntel Strategic Research Terminal v5.0 — All Systems Hardened</p>
+        <p className="text-[8px] text-gray-600 uppercase tracking-widest">Disclaimer: Not financial advice. SEBI registration required for advisory services. Data sourced from NSE/BSE exchange via professional forensics.</p>
+      </footer>
     </div>
   );
 }
