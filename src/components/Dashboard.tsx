@@ -1,57 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Search, History, Cpu, BarChart3, TrendingUp, TrendingDown, 
-  Zap, Clock, Activity, Wallet, FileText, AlertCircle, List, Terminal, Command, CheckCircle2, Settings as SettingsIcon, Key, Globe, BrainCircuit, ExternalLink, Plus, Layers
+  Zap, Clock, Activity, Wallet, FileText, AlertCircle, List, Terminal, Command, CheckCircle2, Settings as SettingsIcon, Key, Globe, BrainCircuit, ExternalLink, Plus, Layers, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
 
-const PROVIDERS = [
-  { id: 'nvidia', name: 'NVIDIA NIM', icon: <Cpu size={16}/>, models: ['meta/llama-3.1-405b-instruct', 'meta/llama-3.1-70b-instruct'] },
-  { id: 'groq', name: 'Groq Cloud', icon: <Zap size={16}/>, models: ['llama3-70b-8192', 'llama3-8b-8192'] },
-  { id: 'openrouter', name: 'OpenRouter', icon: <Globe size={16}/>, models: ['google/gemini-pro-1.5', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o'] }
-];
-
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [showPalette, setShowPalette] = useState(false);
   const [data, setData] = useState<any>(null);
   const [portfolio, setPortfolio] = useState<any>({ total_value: 0, holdings: [] });
   const [researchResult, setResearchResult] = useState<any>(null);
   const [behavior, setBehavior] = useState<any>(null);
   const [docResult, setDocResult] = useState<any>(null);
+  const [pendingEvents, setPendingEvents] = useState<any[]>([]);
   const [titanNews, setTitanNews] = useState<any[]>([]);
   const [marketStatus, setMarketStatus] = useState('CLOSED');
 
   // UI State
-  const [vault, setVault] = useState<any>({});
-  const [isSyncing, setIsSyncing] = useState(false);
   const [researchTicker, setResearchTicker] = useState('');
   const [docText, setDocText] = useState('');
   const [isResearching, setIsResearching] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [newAsset, setNewAsset] = useState({ ticker: '', qty: '', price: '' });
 
-  useHotkeys('ctrl+k', (e) => { e.preventDefault(); setShowPalette(!showPalette); });
+  useHotkeys('ctrl+k', (e) => { e.preventDefault(); });
 
   const fetchInit = async () => {
     try {
-      const [oRes, pRes, nRes] = await Promise.all([
+      const [oRes, pRes, nRes, eRes] = await Promise.all([
         fetch('http://localhost:8008/market/overview'),
         fetch('http://localhost:8008/market/portfolio/summary'),
-        fetch('http://localhost:8008/market/traders/news')
+        fetch('http://localhost:8008/market/traders/news'),
+        fetch('http://localhost:8008/market/events')
       ]);
       const oData = await oRes.json();
       setData(oData);
       setMarketStatus(oData.market_status);
       setPortfolio(await pRes.json());
       setTitanNews(await nRes.json());
+      setPendingEvents(await eRes.json());
     } catch {}
   };
 
-  useEffect(() => { fetchInit(); }, []);
+  useEffect(() => { 
+    fetchInit(); 
+    const interval = setInterval(fetchInit, 60000); // Pulse every 60s
+    return () => clearInterval(interval);
+  }, []);
 
   const runResearch = async () => {
     if (!researchTicker) return;
@@ -101,7 +99,7 @@ export default function Dashboard() {
             <div className="w-10 h-10 bg-cyan-400 rounded-xl flex items-center justify-center text-black shadow-lg shadow-cyan-400/20"><Shield size={24} /></div>
             <h1 className="text-lg font-black tracking-tighter uppercase italic">Sovereign Nexus</h1>
           </div>
-          <div className={cn("px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest", marketStatus === 'OPEN' ? "border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_#10b98110]" : "border-rose-400/30 text-rose-400")}>Market {marketStatus}</div>
+          <div className={cn("px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest", marketStatus === 'OPEN' ? "border-emerald-400/30 text-emerald-400 bg-emerald-400/5" : "border-rose-400/30 text-rose-400")}>Market {marketStatus}</div>
         </div>
         <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
           {['overview', 'portfolio', 'research', 'settings'].map(t => (
@@ -113,23 +111,28 @@ export default function Dashboard() {
       <main className="pt-28 pb-20 px-10 max-w-7xl mx-auto">
         {activeTab === 'overview' && (
            <div className="grid grid-cols-4 gap-6">
-              {data?.Stocks?.map((s: any) => (
-                <div key={s.symbol} className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] relative group overflow-hidden">
-                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity"><Activity size={14} className="text-cyan-400"/></div>
-                   <p className="text-[10px] font-black text-gray-500 uppercase mb-2">{s.symbol}</p>
-                   <p className="text-3xl font-black">₹{s.price.toLocaleString()}</p>
-                   <p className={cn("text-[10px] font-black mt-2", s.change > 0 ? "text-emerald-400" : "text-rose-400")}>{s.change.toFixed(2)}%</p>
-                </div>
-              ))}
-              <div className="col-span-4 space-y-4">
+              {data?.Stocks?.map((s: any) => {
+                const hasEvent = pendingEvents.some(e => e.ticker.toUpperCase() === s.symbol.replace('.NS', '').toUpperCase());
+                return (
+                  <div key={s.symbol} className={cn("p-8 bg-white/5 border rounded-[2.5rem] relative group overflow-hidden transition-all", hasEvent ? "border-rose-500/50 shadow-[0_0_30px_#f43f5e10]" : "border-white/10")}>
+                    {hasEvent && (
+                      <div className="absolute inset-x-0 top-0 py-1.5 bg-rose-500 text-white text-[8px] font-black uppercase tracking-tighter flex items-center justify-center space-x-1">
+                        <AlertTriangle size={8}/><span>Pending Event — Do Not Trade</span>
+                      </div>
+                    )}
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity pt-6"><Activity size={14} className={hasEvent ? "text-rose-500" : "text-cyan-400"}/></div>
+                    <p className="text-[10px] font-black text-gray-500 uppercase mb-2 mt-2">{s.symbol}</p>
+                    <p className="text-3xl font-black">₹{s.price.toLocaleString()}</p>
+                    <p className={cn("text-[10px] font-black mt-2", s.change > 0 ? "text-emerald-400" : "text-rose-400")}>{s.change.toFixed(2)}%</p>
+                  </div>
+                );
+              })}
+              <div className="col-span-4 space-y-4 pt-6">
                  <h2 className="text-xs font-black uppercase text-gray-500 px-4">Whale Feed</h2>
                  <div className="grid grid-cols-2 gap-4">
                     {titanNews.map((n, i) => (
                       <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all flex items-center justify-between group">
-                         <div className="pr-8">
-                            <p className="text-[10px] font-black text-cyan-400 uppercase mb-1">{n.titan}</p>
-                            <h3 className="text-sm font-bold leading-tight">{n.title}</h3>
-                         </div>
+                         <div className="pr-8"><p className="text-[10px] font-black text-cyan-400 uppercase mb-1">{n.titan}</p><h3 className="text-sm font-bold leading-tight">{n.title}</h3></div>
                          <a href={n.url} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0"><ExternalLink size={16}/></a>
                       </div>
                     ))}
@@ -141,28 +144,21 @@ export default function Dashboard() {
         {activeTab === 'portfolio' && (
            <div className="space-y-8">
               <div className="flex items-center justify-between p-12 bg-cyan-400 rounded-[3rem] text-black">
-                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">Portfolio Alpha</p>
-                    <h2 className="text-6xl font-black tracking-tighter italic uppercase">₹{portfolio.total_value.toLocaleString()}</h2>
-                 </div>
+                 <div><p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">Portfolio Alpha</p><h2 className="text-6xl font-black tracking-tighter italic uppercase">₹{portfolio.total_value.toLocaleString()}</h2></div>
                  <div className="w-20 h-20 rounded-3xl bg-black/10 flex items-center justify-center"><Wallet size={40}/></div>
               </div>
               <div className="grid grid-cols-4 gap-4">
-                 <input placeholder="Ticker" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-cyan-400" value={newAsset.ticker} onChange={e => setNewAsset({...newAsset, ticker: e.target.value})} />
-                 <input placeholder="Qty" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-cyan-400" value={newAsset.qty} onChange={e => setNewAsset({...newAsset, qty: e.target.value})} />
-                 <input placeholder="Price" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-cyan-400" value={newAsset.price} onChange={e => setNewAsset({...newAsset, price: e.target.value})} />
+                 <input placeholder="Ticker" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none" value={newAsset.ticker} onChange={e => setNewAsset({...newAsset, ticker: e.target.value})} />
+                 <input placeholder="Qty" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none" value={newAsset.qty} onChange={e => setNewAsset({...newAsset, qty: e.target.value})} />
+                 <input placeholder="Price" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none" value={newAsset.price} onChange={e => setNewAsset({...newAsset, price: e.target.value})} />
                  <button onClick={addAsset} className="bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase hover:bg-cyan-400 hover:text-black transition-all flex items-center justify-center space-x-2"><Plus size={16}/><span>Add Asset</span></button>
               </div>
               <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] overflow-hidden">
                  <table className="w-full text-left">
-                    <thead>
-                       <tr className="text-[10px] font-black uppercase text-gray-500 border-b border-white/5"><th className="pb-4">Asset</th><th className="pb-4 text-right">Qty</th><th className="pb-4 text-right">Avg Price</th><th className="pb-4 text-right">Current</th><th className="pb-4 text-right">PnL</th></tr>
-                    </thead>
+                    <thead><tr className="text-[10px] font-black uppercase text-gray-500 border-b border-white/5"><th className="pb-4">Asset</th><th className="pb-4 text-right">Qty</th><th className="pb-4 text-right">Avg Price</th><th className="pb-4 text-right">Current</th><th className="pb-4 text-right">PnL</th></tr></thead>
                     <tbody className="divide-y divide-white/5">
                        {portfolio.holdings.map((h: any) => (
-                         <tr key={h.symbol} className="text-sm font-bold">
-                            <td className="py-6">{h.symbol}</td><td className="py-6 text-right">{h.qty}</td><td className="py-6 text-right">₹{h.avg_price.toLocaleString()}</td><td className="py-6 text-right font-black">₹{h.curr_price.toLocaleString()}</td><td className={cn("py-6 text-right font-black", h.pnl > 0 ? "text-emerald-400" : "text-rose-400")}>₹{h.pnl.toLocaleString()}</td>
-                         </tr>
+                         <tr key={h.symbol} className="text-sm font-bold"><td className="py-6">{h.symbol}</td><td className="py-6 text-right">{h.qty}</td><td className="py-6 text-right">₹{h.avg_price.toLocaleString()}</td><td className="py-6 text-right font-black">₹{h.curr_price.toLocaleString()}</td><td className={cn("py-6 text-right font-black", h.pnl > 0 ? "text-emerald-400" : "text-rose-400")}>₹{h.pnl.toLocaleString()}</td></tr>
                        ))}
                     </tbody>
                  </table>
@@ -173,42 +169,40 @@ export default function Dashboard() {
         {activeTab === 'research' && (
            <div className="space-y-8">
               <div className="grid grid-cols-2 gap-8">
-                 {/* Research Module */}
                  <div className="space-y-6">
                     <div className="flex space-x-4">
-                       <input placeholder="Enter Ticker (RELIANCE)" className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 text-lg font-black uppercase outline-none focus:border-cyan-400" value={researchTicker} onChange={e => setResearchTicker(e.target.value)} />
+                       <input placeholder="Ticker (RELIANCE)" className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-6 text-lg font-black uppercase outline-none focus:border-cyan-400" value={researchTicker} onChange={e => setResearchTicker(e.target.value)} />
                        <button onClick={runResearch} disabled={isResearching} className="px-10 bg-cyan-400 text-black font-black uppercase rounded-2xl shadow-lg shadow-cyan-400/20">{isResearching ? "..." : "Ignite"}</button>
                     </div>
                     {researchResult && (
                        <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] space-y-6">
-                          <div className="flex items-center justify-between">
-                             <h2 className="text-3xl font-black tracking-tighter uppercase italic">Verdict</h2>
-                             <div className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest", researchResult.Verdict === 'Buy' ? "bg-emerald-400 text-black" : "bg-rose-400 text-white")}>{researchResult.Verdict}</div>
-                          </div>
-                          {behavior && (
-                             <div className="flex items-center space-x-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 w-fit">
-                                <Zap size={14} className="text-cyan-400"/>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400">{behavior.status}</span>
-                             </div>
-                          )}
+                          <div className="flex items-center justify-between"><h2 className="text-3xl font-black italic uppercase">Verdict</h2><div className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest", researchResult.Verdict === 'Buy' ? "bg-emerald-400 text-black" : "bg-rose-400 text-white")}>{researchResult.Verdict}</div></div>
+                          {behavior && <div className="flex items-center space-x-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 w-fit"><Zap size={14} className="text-cyan-400"/><span className="text-[10px] font-black uppercase text-cyan-400">{behavior.status}</span></div>}
                           <p className="text-sm text-gray-400 leading-relaxed">{researchResult.Summary}</p>
                        </div>
                     )}
                  </div>
-                 {/* Document Analysis Module */}
                  <div className="space-y-6">
-                    <h3 className="text-xs font-black uppercase text-gray-500 px-4">Forensic Fine Print Scanner</h3>
-                    <textarea placeholder="Paste regulatory filing or fine print here..." className="w-full h-48 bg-white/5 border border-white/10 rounded-3xl p-6 text-sm outline-none focus:border-cyan-400 resize-none font-medium text-gray-300" value={docText} onChange={e => setDocText(e.target.value)} />
-                    <button onClick={analyzeDoc} disabled={isAnalyzing} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">{isAnalyzing ? "Scanning..." : "Analyze Fine Print"}</button>
+                    <textarea placeholder="Paste fine print here..." className="w-full h-48 bg-white/5 border border-white/10 rounded-3xl p-6 text-sm outline-none resize-none" value={docText} onChange={e => setDocText(e.target.value)} />
+                    <button onClick={analyzeDoc} disabled={isAnalyzing} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10">{isAnalyzing ? "Scanning..." : "Analyze Fine Print"}</button>
                     {docResult && (
                        <div className="p-8 bg-rose-400/5 border border-rose-400/20 rounded-[2.5rem] space-y-4">
                           <div className="flex items-center space-x-3 text-rose-400"><AlertCircle size={18}/><h4 className="text-[10px] font-black uppercase tracking-widest">Liability Flags</h4></div>
-                          <ul className="space-y-2">
-                             {docResult.risk_clauses?.map((c: string, i: number) => <li key={i} className="text-xs font-bold text-gray-400">• {c}</li>)}
-                          </ul>
+                          <ul className="space-y-2">{docResult.risk_clauses?.map((c: string, i: number) => <li key={i} className="text-xs font-bold text-gray-400">• {c}</li>)}</ul>
                        </div>
                     )}
                  </div>
+              </div>
+           </div>
+        )}
+
+        {activeTab === 'settings' && (
+           <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] space-y-6">
+              <div className="flex items-center space-x-4"><Key className="text-cyan-400" size={24} /><h2 className="text-xl font-black uppercase italic">Strategic Vault</h2></div>
+              <div className="grid grid-cols-3 gap-4">
+                 <input placeholder="NVIDIA API Key" type="password" className="bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] font-black uppercase outline-none" onChange={e => saveToVault('nvidia_api_key', e.target.value)} />
+                 <input placeholder="Groq API Key" type="password" className="bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] font-black uppercase outline-none" onChange={e => saveToVault('groq_api_key', e.target.value)} />
+                 <input placeholder="Zerodha API Key" type="password" className="bg-black/40 border border-white/10 rounded-xl p-4 text-[10px] font-black uppercase outline-none" onChange={e => saveToVault('zerodha_api_key', e.target.value)} />
               </div>
            </div>
         )}

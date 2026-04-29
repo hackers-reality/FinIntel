@@ -29,10 +29,7 @@ import pyotp
 from urllib.parse import urlparse, parse_qs
 
 # ── Elite Domain Mesh ────────────────────────────────────────────────
-ELITE_DOMAINS = [
-    "moneycontrol.com", "economictimes.indiatimes.com", "livemint.com",
-    "business-standard.com", "nseindia.com", "bseindia.com", "sebi.gov.in"
-]
+ELITE_DOMAINS = ["moneycontrol.com", "economictimes.indiatimes.com", "livemint.com", "business-standard.com", "nseindia.com", "bseindia.com", "sebi.gov.in"]
 TITANS = ["Vijay Kedia", "Ashish Kacholia", "Mukul Agrawal", "Rakesh Jhunjhunwala Portfolio"]
 
 # ── Native Windows Notifications ─────────────────────────────────────
@@ -83,7 +80,7 @@ def init_db():
         c.execute("CREATE TABLE IF NOT EXISTS fii_dii_flow (id INTEGER PRIMARY KEY, date TEXT UNIQUE, fii_net REAL, dii_net REAL)")
         c.execute("CREATE TABLE IF NOT EXISTS titan_news (id INTEGER PRIMARY KEY, titan TEXT, title TEXT, url TEXT, ts TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS bulk_deals (id INTEGER PRIMARY KEY, ticker TEXT, client TEXT, qty REAL, price REAL, type TEXT, ts TEXT)")
-        c.execute("CREATE TABLE IF NOT EXISTS pending_events (id INTEGER PRIMARY KEY, ticker TEXT, type TEXT, description TEXT, ts TEXT)")
+        c.execute("CREATE TABLE IF NOT EXISTS pending_events (id INTEGER PRIMARY KEY, ticker TEXT, type TEXT, description TEXT, ts TEXT, status TEXT)")
         conn.commit()
 
 @contextmanager
@@ -92,7 +89,7 @@ def db_session():
     try: yield conn.cursor()
     finally: conn.commit(); conn.close()
 
-# ── Intelligence Multi-Mesh (NVIDIA > Groq > OpenAI) ─────
+# ── Intelligence kernel (NVIDIA > Groq > OpenAI) ──────────────
 async def call_llm(messages, json_mode=False):
     with db_session() as c:
         c.execute("SELECT key, value FROM settings WHERE key IN ('active_provider', 'active_model')")
@@ -102,9 +99,7 @@ async def call_llm(messages, json_mode=False):
         c.execute(f"SELECT value FROM settings WHERE key='{provider}_api_key'")
         res = c.fetchone()
         api_key = decrypt_v(res[0]) if res else os.getenv(f"{provider.upper()}_API_KEY")
-
     if not api_key: return "{}"
-
     try:
         base_urls = {"nvidia": "https://integrate.api.nvidia.com/v1", "groq": "https://api.groq.com/openai/v1", "openai": "https://api.openai.com/v1", "openrouter": "https://openrouter.ai/api/v1"}
         client = openai.AsyncOpenAI(api_key=api_key, base_url=base_urls.get(provider))
@@ -152,94 +147,74 @@ async def deep_research(ticker: str):
 
 @app.get("/market/behavior/{ticker}")
 async def behavior_analysis(ticker: str):
-    # Restoring Accumulation Logic
-    prompt = [{"role": "system", "content": "Analyze ticker behavior. Return JSON: status (ACCUMULATION/DISTRIBUTION), sentiment, whales_buying (boolean)."},
-              {"role": "user", "content": f"Ticker: {ticker}. Analyzing current volume and price action patterns."}]
+    prompt = [{"role": "system", "content": "Analyze ticker behavior. Return JSON: status (ACCUMULATION/DISTRIBUTION), sentiment, whales_buying (boolean)."}, {"role": "user", "content": f"Ticker: {ticker}. Pattern detection."}]
     res = await call_llm(prompt, json_mode=True)
     return json.loads(res)
 
-# ── Portfolio Restoration ──────────────────────────────────────────
+# ── Event Tracker Registry ─────────────────────────────────────────
+@app.get("/market/events/{ticker}")
+async def get_events(ticker: str):
+    with db_session() as c:
+        c.execute("SELECT * FROM pending_events WHERE ticker=? AND status='pending'", (ticker,))
+        rows = c.fetchall()
+        return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "ts": r[4], "status": r[5]} for r in rows]
+
+@app.get("/market/events")
+async def get_all_pending_events():
+    with db_session() as c:
+        c.execute("SELECT * FROM pending_events WHERE status='pending'")
+        rows = c.fetchall()
+        return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "ts": r[4], "status": r[5]} for r in rows]
+
+@app.post("/market/events")
+async def create_event(data: Dict):
+    with db_session() as c:
+        c.execute("INSERT INTO pending_events (ticker, type, description, ts, status) VALUES (?, ?, ?, ?, 'pending')",
+                  (data['ticker'], data['event_type'], data['description'], datetime.now().isoformat()))
+    return {"status": "success"}
+
+@app.patch("/market/events/{event_id}")
+async def resolve_event(event_id: int):
+    with db_session() as c:
+        c.execute("UPDATE pending_events SET status='resolved' WHERE id=?", (event_id,))
+    return {"status": "success"}
+
+# ── Portfolio & Fine Print ─────────────────────────────────────────
 @app.post("/market/portfolio/holdings")
 async def update_portfolio(data: Dict):
     with db_session() as c:
         c.execute("INSERT INTO portfolio (ticker, qty, price) VALUES (?, ?, ?)", (data['ticker'], float(data['qty']), float(data['price'])))
-    return {"status": "portfolio updated"}
+    return {"status": "success"}
 
 @app.get("/market/portfolio/summary")
 async def portfolio_summary():
     with db_session() as c:
         c.execute("SELECT ticker, qty, price FROM portfolio")
         rows = c.fetchall()
-    total_value = 0
-    holdings = []
+    total_val = 0; holdings = []
     for r in rows:
-        ticker, qty, avg_price = r[0], r[1], r[2]
+        ticker, qty, avg = r[0], r[1], r[2]
         try:
             h = yf.Ticker(ticker if ".NS" in ticker else f"{ticker}.NS").history(period="1d")
-            cur_price = h['Close'].iloc[-1] if not h.empty else avg_price
-        except: cur_price = avg_price
-        pnl = (cur_price - avg_price) * qty
-        total_value += (cur_price * qty)
-        holdings.append({"symbol": ticker, "qty": qty, "avg_price": avg_price, "curr_price": round(cur_price, 2), "pnl": round(pnl, 2)})
-    return {"total_value": round(total_value, 2), "holdings": holdings}
+            cur = h['Close'].iloc[-1] if not h.empty else avg
+        except: cur = avg
+        pnl = (cur - avg) * qty
+        total_val += (cur * qty)
+        holdings.append({"symbol": ticker, "qty": qty, "avg_price": avg, "curr_price": round(cur, 2), "pnl": round(pnl, 2)})
+    return {"total_value": round(total_val, 2), "holdings": holdings}
 
-# ── Forensic Document Analysis ─────────────────────────────────────
 @app.post("/analyze/document")
 async def analyze_document(data: Dict):
-    # RESTORED: Dad's "Fine Print" Scanner
-    prompt = [{"role": "system", "content": "Analyze document for fine print. Return JSON: risk_clauses, court_case_mentions, regulatory_flags, sentiment_verdict."},
-              {"role": "user", "content": data.get("text", "")}]
+    prompt = [{"role": "system", "content": "Analyze document for fine print. Return JSON: risk_clauses, court_case_mentions, regulatory_flags, sentiment_verdict."}, {"role": "user", "content": data.get("text", "")}]
     res_str = await call_llm(prompt, json_mode=True)
     return json.loads(res_str)
 
-# ── Zerodha Tactical Sync ───────────────────────────────────────────
-@app.post("/market/zerodha/auth")
-async def autonomous_auth():
-    with db_session() as c:
-        c.execute("SELECT key, value FROM settings WHERE key LIKE 'zerodha_%'")
-        creds = {r[0]: decrypt_v(r[1]) for r in c.fetchall()}
-    try:
-        session = requests.Session()
-        login_url = f"https://kite.zerodha.com/connect/login?v=3&api_key={creds['zerodha_api_key']}"
-        session.get(login_url)
-        res = session.post("https://kite.zerodha.com/api/login", data={"user_id": creds['zerodha_user_id'], "password": creds['zerodha_password']})
-        rid = res.json()['data']['request_id']
-        totp = pyotp.TOTP(creds['zerodha_totp_secret']).now()
-        session.post("https://kite.zerodha.com/api/twofa", data={"user_id": creds['zerodha_user_id'], "request_id": rid, "twofa_value": totp, "twofa_type": "totp"})
-        final_url = session.get(login_url).url
-        token = parse_qs(urlparse(final_url).query).get('request_token', [None])[0]
-        kite = KiteConnect(api_key=creds['zerodha_api_key'])
-        data = kite.generate_session(token, api_secret=creds['zerodha_api_secret'])
-        with db_session() as c: c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ("zerodha_access_token", encrypt_v(data["access_token"])))
-        return {"status": "success"}
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/market/zerodha/holdings")
-async def get_zerodha_holdings():
-    with db_session() as c:
-        c.execute("SELECT value FROM settings WHERE key='zerodha_api_key'")
-        api_key = decrypt_v(c.fetchone()[0])
-        c.execute("SELECT value FROM settings WHERE key='zerodha_access_token'")
-        access_token = decrypt_v(c.fetchone()[0])
-    kite = KiteConnect(api_key=api_key)
-    kite.set_access_token(access_token)
-    return kite.holdings()
-
-# ── Settings & Vault ───────────────────────────────────────────────
+# ── Settings & Auth ────────────────────────────────────────────────
 @app.post("/settings/vault")
 async def vault_settings(data: Dict):
     with db_session() as c:
         for k, v in data.items(): c.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, encrypt_v(v)))
     return {"status": "success"}
-
-@app.get("/settings/verify/{provider}")
-async def verify_key(provider: str, key: str):
-    try:
-        base_urls = {"nvidia": "https://integrate.api.nvidia.com/v1", "groq": "https://api.groq.com/openai/v1", "openai": "https://api.openai.com/v1"}
-        client = openai.OpenAI(api_key=key, base_url=base_urls.get(provider))
-        client.models.list()
-        return {"status": "valid"}
-    except: return {"status": "invalid"}
 
 # ── Sentinel Sync Loop ──────────────────────────────────────────────
 def sentinel_sync_loop():
