@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [docResult, setDocResult] = useState<any>(null);
   const [pendingEvents, setPendingEvents] = useState<any[]>([]);
   const [titanNews, setTitanNews] = useState<any[]>([]);
+  const [fiidii, setFiidii] = useState<any[]>([]);
+  const [bulkDeals, setBulkDeals] = useState<any[]>([]);
   const [marketStatus, setMarketStatus] = useState('CLOSED');
 
   // UI State
@@ -30,11 +32,13 @@ export default function Dashboard() {
 
   const fetchInit = async () => {
     try {
-      const [oRes, pRes, nRes, eRes] = await Promise.all([
+      const [oRes, pRes, nRes, eRes, fRes, bRes] = await Promise.all([
         fetch('http://localhost:8008/market/overview'),
         fetch('http://localhost:8008/market/portfolio/summary'),
         fetch('http://localhost:8008/market/traders/news'),
-        fetch('http://localhost:8008/market/events')
+        fetch('http://localhost:8008/market/events'),
+        fetch('http://localhost:8008/market/fiidii'),
+        fetch('http://localhost:8008/market/bulkdeals')
       ]);
       const oData = await oRes.json();
       setData(oData);
@@ -42,12 +46,14 @@ export default function Dashboard() {
       setPortfolio(await pRes.json());
       setTitanNews(await nRes.json());
       setPendingEvents(await eRes.json());
+      setFiidii(await fRes.json());
+      setBulkDeals(await bRes.json());
     } catch {}
   };
 
   useEffect(() => { 
     fetchInit(); 
-    const interval = setInterval(fetchInit, 60000); // Pulse every 60s
+    const interval = setInterval(fetchInit, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -110,32 +116,52 @@ export default function Dashboard() {
 
       <main className="pt-28 pb-20 px-10 max-w-7xl mx-auto">
         {activeTab === 'overview' && (
-           <div className="grid grid-cols-4 gap-6">
-              {data?.Stocks?.map((s: any) => {
-                const hasEvent = pendingEvents.some(e => e.ticker.toUpperCase() === s.symbol.replace('.NS', '').toUpperCase());
-                return (
-                  <div key={s.symbol} className={cn("p-8 bg-white/5 border rounded-[2.5rem] relative group overflow-hidden transition-all", hasEvent ? "border-rose-500/50 shadow-[0_0_30px_#f43f5e10]" : "border-white/10")}>
-                    {hasEvent && (
-                      <div className="absolute inset-x-0 top-0 py-1.5 bg-rose-500 text-white text-[8px] font-black uppercase tracking-tighter flex items-center justify-center space-x-1">
-                        <AlertTriangle size={8}/><span>Pending Event — Do Not Trade</span>
-                      </div>
-                    )}
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-100 transition-opacity pt-6"><Activity size={14} className={hasEvent ? "text-rose-500" : "text-cyan-400"}/></div>
-                    <p className="text-[10px] font-black text-gray-500 uppercase mb-2 mt-2">{s.symbol}</p>
-                    <p className="text-3xl font-black">₹{s.price.toLocaleString()}</p>
-                    <p className={cn("text-[10px] font-black mt-2", s.change > 0 ? "text-emerald-400" : "text-rose-400")}>{s.change.toFixed(2)}%</p>
-                  </div>
-                );
-              })}
-              <div className="col-span-4 space-y-4 pt-6">
-                 <h2 className="text-xs font-black uppercase text-gray-500 px-4">Whale Feed</h2>
-                 <div className="grid grid-cols-2 gap-4">
-                    {titanNews.map((n, i) => (
-                      <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all flex items-center justify-between group">
-                         <div className="pr-8"><p className="text-[10px] font-black text-cyan-400 uppercase mb-1">{n.titan}</p><h3 className="text-sm font-bold leading-tight">{n.title}</h3></div>
-                         <a href={n.url} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0"><ExternalLink size={16}/></a>
-                      </div>
-                    ))}
+           <div className="space-y-10">
+              <div className="grid grid-cols-4 gap-6">
+                 {data?.Stocks?.map((s: any) => {
+                   const hasEvent = pendingEvents.some(e => e.ticker.toUpperCase() === s.symbol.replace('.NS', '').toUpperCase());
+                   return (
+                     <div key={s.symbol} className={cn("p-8 bg-white/5 border rounded-[2.5rem] relative group overflow-hidden transition-all", hasEvent ? "border-rose-500/50 shadow-[0_0_30px_#f43f5e10]" : "border-white/10")}>
+                       {hasEvent && (
+                         <div className="absolute inset-x-0 top-0 py-1.5 bg-rose-500 text-white text-[8px] font-black uppercase tracking-tighter flex items-center justify-center space-x-1">
+                           <AlertTriangle size={8}/><span>Pending Event — Do Not Trade</span>
+                         </div>
+                       )}
+                       <p className="text-[10px] font-black text-gray-500 uppercase mb-2 mt-2">{s.symbol}</p>
+                       <p className="text-3xl font-black">₹{s.price.toLocaleString()}</p>
+                       <p className={cn("text-[10px] font-black mt-2", s.change > 0 ? "text-emerald-400" : "text-rose-400")}>{s.change.toFixed(2)}%</p>
+                     </div>
+                   );
+                 })}
+              </div>
+              <div className="grid grid-cols-3 gap-8">
+                 <div className="col-span-2 space-y-4">
+                    <h2 className="text-xs font-black uppercase text-gray-500 px-4">Institutional Whale Command</h2>
+                    <div className="p-8 bg-white/5 border border-white/10 rounded-[3rem] space-y-6">
+                       <div className="grid grid-cols-2 gap-8 pb-6 border-b border-white/5">
+                          <div><p className="text-[10px] font-black uppercase text-gray-500 mb-2">FII Net Flow</p><p className={cn("text-2xl font-black", (fiidii[0]?.fii || 0) > 0 ? "text-emerald-400" : "text-rose-400")}>{fiidii[0]?.fii?.toFixed(0) || 0} Cr</p></div>
+                          <div><p className="text-[10px] font-black uppercase text-gray-500 mb-2">DII Net Flow</p><p className={cn("text-2xl font-black", (fiidii[0]?.dii || 0) > 0 ? "text-emerald-400" : "text-rose-400")}>{fiidii[0]?.dii?.toFixed(0) || 0} Cr</p></div>
+                       </div>
+                       <div className="space-y-4">
+                          {bulkDeals.map((d, i) => (
+                            <div key={i} className="flex items-center justify-between group">
+                               <div><p className="text-[10px] font-black text-cyan-400 uppercase">{d.ticker}</p><h3 className="text-sm font-bold text-gray-300">{d.client}</h3></div>
+                               <div className="text-right"><p className={cn("text-[10px] font-black uppercase", d.type === 'BUY' ? "text-emerald-400" : "text-rose-400")}>{d.type} @ ₹{d.price}</p><p className="text-[10px] font-black text-gray-500">{d.qty.toLocaleString()} SHARES</p></div>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                 </div>
+                 <div className="space-y-4">
+                    <h2 className="text-xs font-black uppercase text-gray-500 px-4">Titan Whale Feed</h2>
+                    <div className="space-y-4">
+                       {titanNews.map((n, i) => (
+                         <div key={i} className="p-6 bg-white/5 border border-white/10 rounded-3xl hover:bg-white/10 transition-all flex items-center justify-between group">
+                            <div className="pr-4"><p className="text-[10px] font-black text-cyan-400 uppercase mb-1">{n.titan}</p><h3 className="text-xs font-bold leading-tight line-clamp-2">{n.title}</h3></div>
+                            <a href={n.url} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0"><ExternalLink size={14}/></a>
+                         </div>
+                       ))}
+                    </div>
                  </div>
               </div>
            </div>
@@ -148,9 +174,9 @@ export default function Dashboard() {
                  <div className="w-20 h-20 rounded-3xl bg-black/10 flex items-center justify-center"><Wallet size={40}/></div>
               </div>
               <div className="grid grid-cols-4 gap-4">
-                 <input placeholder="Ticker" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none" value={newAsset.ticker} onChange={e => setNewAsset({...newAsset, ticker: e.target.value})} />
-                 <input placeholder="Qty" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none" value={newAsset.qty} onChange={e => setNewAsset({...newAsset, qty: e.target.value})} />
-                 <input placeholder="Price" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none" value={newAsset.price} onChange={e => setNewAsset({...newAsset, price: e.target.value})} />
+                 <input placeholder="Ticker" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-cyan-400" value={newAsset.ticker} onChange={e => setNewAsset({...newAsset, ticker: e.target.value})} />
+                 <input placeholder="Qty" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-cyan-400" value={newAsset.qty} onChange={e => setNewAsset({...newAsset, qty: e.target.value})} />
+                 <input placeholder="Price" className="bg-white/5 border border-white/10 rounded-2xl p-4 text-[10px] font-black uppercase outline-none focus:border-cyan-400" value={newAsset.price} onChange={e => setNewAsset({...newAsset, price: e.target.value})} />
                  <button onClick={addAsset} className="bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase hover:bg-cyan-400 hover:text-black transition-all flex items-center justify-center space-x-2"><Plus size={16}/><span>Add Asset</span></button>
               </div>
               <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] overflow-hidden">

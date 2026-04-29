@@ -152,32 +152,12 @@ async def behavior_analysis(ticker: str):
     return json.loads(res)
 
 # ── Event Tracker Registry ─────────────────────────────────────────
-@app.get("/market/events/{ticker}")
-async def get_events(ticker: str):
-    with db_session() as c:
-        c.execute("SELECT * FROM pending_events WHERE ticker=? AND status='pending'", (ticker,))
-        rows = c.fetchall()
-        return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "ts": r[4], "status": r[5]} for r in rows]
-
 @app.get("/market/events")
 async def get_all_pending_events():
     with db_session() as c:
         c.execute("SELECT * FROM pending_events WHERE status='pending'")
         rows = c.fetchall()
         return [{"id": r[0], "ticker": r[1], "type": r[2], "description": r[3], "ts": r[4], "status": r[5]} for r in rows]
-
-@app.post("/market/events")
-async def create_event(data: Dict):
-    with db_session() as c:
-        c.execute("INSERT INTO pending_events (ticker, type, description, ts, status) VALUES (?, ?, ?, ?, 'pending')",
-                  (data['ticker'], data['event_type'], data['description'], datetime.now().isoformat()))
-    return {"status": "success"}
-
-@app.patch("/market/events/{event_id}")
-async def resolve_event(event_id: int):
-    with db_session() as c:
-        c.execute("UPDATE pending_events SET status='resolved' WHERE id=?", (event_id,))
-    return {"status": "success"}
 
 # ── Portfolio & Fine Print ─────────────────────────────────────────
 @app.post("/market/portfolio/holdings")
@@ -209,7 +189,26 @@ async def analyze_document(data: Dict):
     res_str = await call_llm(prompt, json_mode=True)
     return json.loads(res_str)
 
-# ── Settings & Auth ────────────────────────────────────────────────
+# ── Institutional Feeds ────────────────────────────────────────────
+@app.get("/market/traders/news")
+async def titan_news():
+    with db_session() as c:
+        c.execute("SELECT titan, title, url, ts FROM titan_news ORDER BY ts DESC LIMIT 10")
+        return [{"titan": r[0], "title": r[1], "url": r[2], "date": r[3]} for r in c.fetchall()]
+
+@app.get("/market/fiidii")
+async def fii_dii_data():
+    with db_session() as c:
+        c.execute("SELECT date, fii_net, dii_net FROM fii_dii_flow ORDER BY date DESC LIMIT 10")
+        return [{"date": r[0], "fii": r[1], "dii": r[2]} for r in c.fetchall()]
+
+@app.get("/market/bulkdeals")
+async def bulk_deals():
+    with db_session() as c:
+        c.execute("SELECT ticker, client, qty, price, type, ts FROM bulk_deals ORDER BY ts DESC LIMIT 10")
+        return [{"ticker": r[0], "client": r[1], "qty": r[2], "price": r[3], "type": r[4], "date": r[5]} for r in c.fetchall()]
+
+# ── Settings & Vault ───────────────────────────────────────────────
 @app.post("/settings/vault")
 async def vault_settings(data: Dict):
     with db_session() as c:
@@ -217,16 +216,44 @@ async def vault_settings(data: Dict):
     return {"status": "success"}
 
 # ── Sentinel Sync Loop ──────────────────────────────────────────────
+async def forensic_institutional_parse(type: str, text: str):
+    prompts = {
+        "fiidii": "Extract FII and DII net cash market flow from the news. Return JSON: {'fii': float, 'dii': float}. Use 0 if not found.",
+        "bulk": "Extract Bulk/Block deal details from the news. Return JSON list of deals: [{'ticker': str, 'client': str, 'qty': float, 'price': float, 'type': str}]. Return empty list if none."
+    }
+    prompt = [{"role": "system", "content": prompts[type]}, {"role": "user", "content": f"Text: {text}"}]
+    res = await call_llm(prompt, json_mode=True)
+    try: return json.loads(res)
+    except: return {"fii": 0.0, "dii": 0.0} if type == "fiidii" else []
+
 def sentinel_sync_loop():
     while True:
         try:
             now = datetime.now(IST)
             with DDGS() as ddgs:
+                # 1. Titan News
                 for t in TITANS:
                     res = list(ddgs.text(f"{t} latest investment news", max_results=1))
                     if res:
                         with db_session() as c:
                             c.execute("INSERT OR IGNORE INTO titan_news (titan, title, url, ts) VALUES (?, ?, ?, ?)", (t, res[0]['title'], res[0]['href'], now.isoformat()))
+                
+                # 2. FII/DII Scrape & Parse
+                res = list(ddgs.text("NSE FII DII cash market net flow today moneycontrol", max_results=1))
+                if res:
+                    flow = asyncio.run(forensic_institutional_parse("fiidii", res[0]['body']))
+                    if flow.get('fii') or flow.get('dii'):
+                        with db_session() as c:
+                            c.execute("INSERT OR IGNORE INTO fii_dii_flow (date, fii_net, dii_net) VALUES (?, ?, ?)", (now.date().isoformat(), flow['fii'], flow['dii']))
+                
+                # 3. Bulk Deal Scrape & Parse
+                res = list(ddgs.text("NSE bulk block deals moneycontrol today", max_results=1))
+                if res:
+                    deals = asyncio.run(forensic_institutional_parse("bulk", res[0]['body']))
+                    with db_session() as c:
+                        for d in deals:
+                            c.execute("INSERT INTO bulk_deals (ticker, client, qty, price, type, ts) VALUES (?, ?, ?, ?, ?, ?)", 
+                                      (d['ticker'], d['client'], d['qty'], d['price'], d['type'], now.isoformat()))
             time.sleep(3600)
         except: time.sleep(300)
 
