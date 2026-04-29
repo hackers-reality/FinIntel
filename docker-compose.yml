@@ -1,23 +1,26 @@
 version: '3.8'
 
 services:
-  nexus-kernel:
-    build: ./backend
-    container_name: nexus-kernel
+  finintel-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: finintel-api
     ports:
       - "8008:8008"
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
       - ./finintel.db:/app/finintel.db
+      - ./.env:/app/.env
     env_file:
       - .env
     restart: always
 
-  tactical-interface:
+  finintel-web:
     build: .
-    container_name: tactical-interface
+    container_name: finintel-web
     ports:
       - "5173:5173"
     depends_on:
-      - nexus-kernel
+      - finintel-api
     restart: always

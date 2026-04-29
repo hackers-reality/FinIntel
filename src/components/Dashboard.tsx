@@ -1,86 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { Shield } from 'lucide-react';
-import OverviewPanel from './OverviewPanel';
-import PortfolioPanel from './PortfolioPanel';
-import ResearchPanel from './ResearchPanel';
-import SettingsPanel from './SettingsPanel';
-import SectorPanel from './SectorPanel';
-import { StockIndex, SectorData, PortfolioSummary, InstitutionalNews, InstitutionalFlow, StrategicEvent } from '../types/market';
+import { useEffect, useState } from 'react'
+import { Shield } from 'lucide-react'
 
-const cn = (...classes: string[]) => classes.filter(Boolean).join(' ');
+import { useAuth } from '../hooks/useAuth'
+import { useBroker } from '../hooks/useBroker'
+import { useMarketData } from '../hooks/useMarketData'
+import { usePortfolio } from '../hooks/usePortfolio'
+import { useResearch } from '../hooks/useResearch'
+import { settingsService } from '../services/settings'
+import type { ComplianceBundle, UserSettings } from '../types/settings'
+import OverviewPanel from './OverviewPanel'
+import PortfolioPanel from './PortfolioPanel'
+import ResearchPanel from './ResearchPanel'
+import SectorPanel from './SectorPanel'
+import SettingsPanel from './SettingsPanel'
+
+const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
+
+type DashboardTab = 'overview' | 'sectors' | 'portfolio' | 'research' | 'settings'
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [data, setData] = useState<{ Stocks: StockIndex[] } | null>(null);
-  const [sectors, setSectors] = useState<SectorData[]>([]);
-  const [portfolio, setPortfolio] = useState<PortfolioSummary>({ total_value: 0, holdings: [] });
-  const [researchResult, setResearchResult] = useState<any>(null);
-  const [behavior, setBehavior] = useState<any>(null);
-  const [docResult, setDocResult] = useState<any>(null);
-  const [pendingEvents, setPendingEvents] = useState<StrategicEvent[]>([]);
-  const [titanNews, setTitanNews] = useState<InstitutionalNews[]>([]);
-  const [fiidii, setFiidii] = useState<InstitutionalFlow[]>([]);
-  const [bulkDeals, setBulkDeals] = useState<any[]>([]);
-  const [marketStatus, setMarketStatus] = useState('CLOSED');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('overview')
+  const { sessionToken, isLoading: isAuthLoading, error: authError } = useAuth()
+  const { account: brokerAccount, error: brokerError } = useBroker(sessionToken)
+  const { overview, sectors, news, flows, bulkDeals, events, isLoading: isMarketLoading, error: marketError } = useMarketData()
+  const { portfolio, newHolding, setNewHolding, addHolding, error: portfolioError } = usePortfolio(sessionToken)
+  const {
+    researchTicker,
+    setResearchTicker,
+    documentText,
+    setDocumentText,
+    researchResult,
+    behavior,
+    companyIntel,
+    documentRisk,
+    isResearching,
+    isAnalyzing,
+    error: researchError,
+    runResearch,
+    analyzeDocument,
+  } = useResearch(sessionToken)
+  const [compliance, setCompliance] = useState<ComplianceBundle | null>(null)
+  const [settings, setSettings] = useState<UserSettings | null>(null)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
 
-  // Logic State
-  const [researchTicker, setResearchTicker] = useState('');
-  const [docText, setDocText] = useState('');
-  const [isResearching, setIsResearching] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [newAsset, setNewAsset] = useState({ ticker: '', qty: '', price: '' });
+  useEffect(() => {
+    void settingsService.getCompliance().then(setCompliance).catch(() => {
+      setSettingsError('Unable to load compliance information.')
+    })
+  }, [])
 
-  const fetchInit = async () => {
+  useEffect(() => {
+    if (!sessionToken) {
+      return
+    }
+    void settingsService.getSettings(sessionToken).then(setSettings).catch(() => {
+      setSettingsError('Unable to load user settings.')
+    })
+  }, [sessionToken])
+
+  async function acknowledgeRisk() {
+    if (!sessionToken) {
+      return
+    }
     try {
-      const [oRes, sRes, pRes, nRes, eRes, fRes, bRes] = await Promise.all([
-        fetch('http://localhost:8008/market/overview'), fetch('http://localhost:8008/market/sectors'),
-        fetch('http://localhost:8008/market/portfolio/summary'), fetch('http://localhost:8008/market/traders/news'),
-        fetch('http://localhost:8008/market/events'), fetch('http://localhost:8008/market/fiidii'),
-        fetch('http://localhost:8008/market/bulkdeals')
-      ]);
-      const oData = await oRes.json();
-      setData(oData);
-      setMarketStatus(oData.market_status);
-      setSectors(await sRes.json());
-      setPortfolio(await pRes.json());
-      setTitanNews(await nRes.json());
-      setPendingEvents(await eRes.json());
-      setFiidii(await fRes.json());
-      setBulkDeals(await bRes.json());
-    } catch {}
-  };
+      const updatedSettings = await settingsService.updateSettings({ risk_acknowledged: true }, sessionToken)
+      setSettings(updatedSettings)
+      setSettingsError(null)
+    } catch {
+      setSettingsError('Unable to update the compliance acknowledgment.')
+    }
+  }
 
-  useEffect(() => { fetchInit(); const i = setInterval(fetchInit, 60000); return () => clearInterval(i); }, []);
-
-  const runResearch = async () => {
-    if (!researchTicker) return;
-    setIsResearching(true);
-    const [rRes, bRes] = await Promise.all([
-      fetch(`http://localhost:8008/market/research/${researchTicker}`), fetch(`http://localhost:8008/market/behavior/${researchTicker}`)
-    ]);
-    setResearchResult(await rRes.json());
-    setBehavior(await bRes.json());
-    setIsResearching(false);
-  };
-
-  const analyzeDoc = async () => {
-    if (!docText) return;
-    setIsAnalyzing(true);
-    const res = await fetch('http://localhost:8008/analyze/document', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: docText }) });
-    setDocResult(await res.json());
-    setIsAnalyzing(false);
-  };
-
-  const addAsset = async () => {
-    if (!newAsset.ticker) return;
-    await fetch('http://localhost:8008/market/portfolio/holdings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAsset) });
-    setNewAsset({ ticker: '', qty: '', price: '' });
-    fetchInit();
-  };
-
-  const saveToVault = async (key: string, value: string) => {
-    await fetch('http://localhost:8008/settings/vault', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }) });
-  };
+  const surfaceError = authError ?? brokerError ?? marketError ?? portfolioError ?? researchError ?? settingsError
+  const marketStatus = overview?.market_status ?? 'CLOSED'
 
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
@@ -88,29 +80,49 @@ export default function Dashboard() {
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-4">
             <div className="w-10 h-10 bg-cyan-400 rounded-xl flex items-center justify-center text-black shadow-lg shadow-cyan-400/20"><Shield size={24} /></div>
-            <h1 className="text-lg font-black tracking-tighter uppercase italic">FinIntel Terminal</h1>
+            <h1 className="text-lg font-black tracking-tighter uppercase italic">FinIntel Market Intelligence</h1>
           </div>
-          <div className={cn("px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest", marketStatus === 'OPEN' ? "border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_#10b98110]" : "border-rose-400/30 text-rose-400")}>Market {marketStatus}</div>
+          <div className={cn('px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest', marketStatus === 'OPEN' ? 'border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_#10b98110]' : 'border-rose-400/30 text-rose-400')}>Market {marketStatus}</div>
         </div>
         <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
-          {['overview', 'sectors', 'portfolio', 'research', 'settings'].map(t => (
-            <button key={t} onClick={() => setActiveTab(t)} className={cn("px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all", activeTab === t ? "bg-white/10 text-white" : "text-gray-500")}>{t}</button>
+          {(['overview', 'sectors', 'portfolio', 'research', 'settings'] as DashboardTab[]).map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>{tab}</button>
           ))}
         </div>
       </nav>
 
-      <main className="flex-1 pt-28 pb-20 px-10 max-w-7xl mx-auto w-full">
-        {activeTab === 'overview' && data && <OverviewPanel data={data} titanNews={titanNews} fiidii={fiidii} bulkDeals={bulkDeals} pendingEvents={pendingEvents} marketStatus={marketStatus} />}
+      <main className="flex-1 pt-28 pb-20 px-10 max-w-7xl mx-auto w-full space-y-6">
+        {(isAuthLoading || isMarketLoading) && <p className="text-sm text-gray-400">Loading market intelligence workspace...</p>}
+        {surfaceError && <p className="text-sm text-rose-300">{surfaceError}</p>}
+
+        {activeTab === 'overview' && overview && <OverviewPanel overview={overview} news={news} flows={flows} bulkDeals={bulkDeals} events={events} />}
         {activeTab === 'sectors' && <SectorPanel sectors={sectors} />}
-        {activeTab === 'portfolio' && <PortfolioPanel portfolio={portfolio} newAsset={newAsset} setNewAsset={setNewAsset} addAsset={addAsset} />}
-        {activeTab === 'research' && <ResearchPanel researchTicker={researchTicker} setResearchTicker={setResearchTicker} runResearch={runResearch} isResearching={isResearching} researchResult={researchResult} behavior={behavior} docText={docText} setDocText={setDocText} analyzeDoc={analyzeDoc} isAnalyzing={isAnalyzing} docResult={docResult} />}
-        {activeTab === 'settings' && <SettingsPanel saveToVault={saveToVault} />}
+        {activeTab === 'portfolio' && <PortfolioPanel portfolio={portfolio} newHolding={newHolding} setNewHolding={setNewHolding} addHolding={addHolding} />}
+        {activeTab === 'research' && (
+          <ResearchPanel
+            researchTicker={researchTicker}
+            setResearchTicker={setResearchTicker}
+            runResearch={runResearch}
+            isResearching={isResearching}
+            researchResult={researchResult}
+            behavior={behavior}
+            companyIntel={companyIntel}
+            documentText={documentText}
+            setDocumentText={setDocumentText}
+            analyzeDocument={analyzeDocument}
+            isAnalyzing={isAnalyzing}
+            documentRisk={documentRisk}
+          />
+        )}
+        {activeTab === 'settings' && <SettingsPanel settings={settings} compliance={compliance} brokerAccount={brokerAccount} onAcknowledgeRisk={acknowledgeRisk} />}
       </main>
 
       <footer className="py-6 px-10 border-t border-white/5 bg-black/40 backdrop-blur-xl text-center">
-        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-1">FinIntel Strategic Research Terminal v5.0 — All Systems Hardened</p>
-        <p className="text-[8px] text-gray-600 uppercase tracking-widest">Disclaimer: Not financial advice. SEBI registration required for advisory services. Data sourced from NSE/BSE exchange via professional forensics.</p>
+        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-1">FinIntel Investor Research Platform</p>
+        <p className="text-[8px] text-gray-600 uppercase tracking-widest">
+          Not investment advice. Review disclosures, verify data sources, and comply with applicable SEBI and broker requirements before acting on any analysis.
+        </p>
       </footer>
     </div>
-  );
+  )
 }

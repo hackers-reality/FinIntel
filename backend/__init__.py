@@ -1,0 +1,1 @@
+"""FinIntel backend package."""

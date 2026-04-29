@@ -1,11 +1,8 @@
-# Backend Dockerfile (Nexus Kernel)
 FROM python:3.10-slim
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install winotify kiteconnect pytz requests
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+COPY backend ./backend
 
-COPY . .
-
-CMD ["python", "main.py"]
+CMD ["python", "-m", "backend.main"]

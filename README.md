@@ -1,153 +1,91 @@
-# FinIntel Terminal: Strategic Intelligence Nexus
-> **Institutional-grade financial intelligence terminal designed for the Indian market. Optimized for high-fidelity retail research, professional portfolio management, and strategic market forensics.**
+# FinIntel
 
----
+FinIntel is an Indian market intelligence platform for portfolio monitoring, sector analysis, ticker research, and document risk review. The current build focuses on safer defaults, stronger type safety, modular backend services, and clearer compliance language.
 
-## 🏛️ Strategic Architecture Map
+## What it does
 
-```mermaid
-graph LR
-    subgraph "DATA INGESTION MESH"
-        L[Zerodha KiteConnect] --- L1[Auth & Holdings]
-        M[NSE/BSE Exchange] --- M1[Price Feeds]
-        N[LLM Mesh / NVIDIA & Groq] --- N1[Reasoning]
-        O[Open Intelligence / Web] --- O1[Sentiment]
-    end
+- Market overview for Nifty, Sensex, India VIX, and USD/INR
+- Sector performance heatmap for major Indian indices
+- Portfolio valuation and holding-level PnL tracking
+- Heuristic research summaries and momentum/behavior signals
+- Document clause scanning for common legal and risk keywords
+- Compliance, privacy, and risk-disclosure surfaces in the product
 
-    subgraph "INTELLIGENCE KERNEL (FastAPI)"
-        L1 --> A[FastAPI Kernel]
-        M1 --> A
-        N1 --> A
-        O1 --> A
-        
-        A --> B[Institutional News Forensics]
-        A --> C[VIX & Price Sentinels]
-        A --> D[Portfolio & Event Vault]
-        A --> E[Sectoral Performance Engine]
-    end
+## Architecture
 
-    subgraph "TACTICAL INTERFACE (React/Vite)"
-        F[Global Terminal Orchestrator]
-        F --> G[Overview Module]
-        F --> H[Sector Heatmap]
-        F --> I[Portfolio Management]
-        F --> J[Forensic Analysis Panel]
-        F --> K[Credential Vault]
-    end
+- Frontend: React, TypeScript, Vite
+- Backend: FastAPI with modular routers, schemas, services, and SQLite persistence
+- Data: Yahoo Finance market data and local application records
+- Session model: short-lived signed application sessions for protected write operations
 
-    A -->|Streaming Sync| F
-```
+## Security and compliance posture
 
----
+- Broker credentials are not collected or persisted in the application UI
+- Provider keys should be supplied through environment variables or an external secret manager
+- Zerodha integration, when enabled, is read-only portfolio intelligence only; FinIntel does not place, modify, or cancel orders
+- Protected write routes require a signed session token issued by the backend
+- The product includes investment-risk, privacy, and terms disclosures
+- The app is an informational research tool, not a brokerage or personalized advisory service
 
-## 📑 Table of Contents
-- [🏛️ Strategic Architecture](#-strategic-architecture-map)
-- [🚀 Institutional Feature Set](#-institutional-feature-set)
-- [🛠️ Institutional Tech Stack](#-institutional-tech-stack)
-- [⚡ Getting Started](#-getting-started)
-- [⚙️ Granular Configuration](#-granular-configuration)
-- [📂 Project Topology](#-project-topology)
-- [🛡️ Security & Compliance](#-security--compliance)
+## Local development
 
----
-
-## 🚀 Institutional Feature Set
-
-### 1. Market Intelligence Dashboard
-- **Institutional Flow Tracker:** Real-time tracking of FII/DII net flows and Bulk/Block deals. Uses LLM-driven forensic extraction from professional news feeds.
-- **Titan Social Sentinel:** Automated intelligence gathering from X (Twitter) and professional blogs for major high-conviction Indian investors.
-- **Volatility Sentinel:** Background monitoring of India VIX (^INDIAVIX) with native Windows OS alerts triggered at the 20-point threshold.
-
-### 2. Strategic Research Module
-- **Institutional Ticker Research:** Multi-LLM reasoning (NVIDIA NIM 405B, Groq 70B) with persistent context for deep-dive ticker analysis.
-- **Fine Print Forensic Scanner:** Advanced NLP engine for scanning regulatory filings, legal documents, and fine print for risk clauses and regulatory flags.
-- **Market Accumulation Pulse:** Pattern detection logic to identify institutional accumulation or distribution phases.
-
-### 3. Professional Portfolio Vault
-- **Real-time Asset Tracking:** Automated PnL calculation synchronized with live NSE/BSE exchange data via `yfinance`.
-- **Sector Performance Heatmap:** Visual top-down rotation analysis across primary Nifty sectoral indices (Bank, Auto, IT, Pharma, etc.).
-
----
-
-## 🛠️ Institutional Tech Stack
-
-- **Backend:** Python 3.10+, FastAPI (Asynchronous Kernel), Uvicorn.
-- **Frontend:** React 18, Vite, Tailwind CSS, Framer Motion (Institutional UI).
-- **Intelligence Mesh:** NVIDIA NIM (Llama-3.1), Groq Cloud, OpenRouter, OpenAI.
-- **Data Protocols:** KiteConnect SDK, YFinance, DuckDuckGo Forensic Search.
-- **Security:** AES-256 (Fernet) Encryption, SQLite Secure Local Vault.
-
----
-
-## ⚡ Getting Started
-
-### 1. Zero-Config Global Ignition
-The terminal is designed for a single-command deployment. Clone the repository and run:
-```powershell
-./install.ps1
-finintel
-```
-*The installer automatically provisions Python dependencies, Node modules, and registers the global terminal command.*
-
-### 2. Manual Activation
 ```bash
-# Backend Ignition
-cd backend && pip install -r requirements.txt
-python main.py
+# Backend
+pip install -r backend/requirements.txt
+python -m backend.main
 
-# Frontend Ignition
-npm install && npm run dev
+# Frontend
+npm install
+npm run dev
 ```
 
----
+Or run both with:
 
-## ⚙️ Granular Configuration
+```powershell
+python run.py
+```
 
-### A. Zerodha KiteConnect (Institutional Sync)
-To enable live portfolio forensics and brokerage session handshakes:
-1.  **Register App:** Visit [Zerodha Developers](https://developers.kite.trade/apps).
-2.  **Redirect URL:** Set exactly to `http://localhost:8008/market/zerodha/callback`.
-3.  **Client ID:** Your standard Zerodha ID (e.g., AB1234).
-4.  **API Key/Secret:** Obtain from the Developer Console and enter in the **Settings** tab.
-5.  **TOTP Seed:** Ensure 2FA is active. Capture the Secret Seed during setup to enable automated session persistence.
+## Environment
 
-### B. LLM Intelligence Mesh
-Configure these in the **Credential Vault** (Settings Panel):
-- **NVIDIA NIM:** Recommended for high-conviction strategic research (Meta-Llama-3.1-405B).
-- **Groq Cloud:** Recommended for low-latency institutional news forensics.
-- **OpenRouter:** Provides universal fallback to Claude 3.5 Sonnet and Gemini 1.5 Pro.
+Use `.env.example` as the baseline. Important variables:
 
----
+- `VITE_API_BASE_URL`
+- `FININTEL_APP_SECRET`
+- `FININTEL_ALLOWED_ORIGINS`
+- `FININTEL_DB_PATH`
+- `FININTEL_ENABLE_BROKER_READONLY`
+- `ZERODHA_API_KEY`
+- `ZERODHA_ACCESS_TOKEN`
 
-## 📂 Project Topology
+## Project layout
 
 ```text
-finintel-pro/
-├── backend/
-│   ├── main.py          # Intelligence Kernel (FastAPI)
-│   ├── requirements.txt # Kernel Dependency Manifest
-├── src/
-│   ├── components/      # Tactical Interface Modules
-│   │   ├── OverviewPanel.tsx
-│   │   ├── SectorPanel.tsx
-│   │   ├── PortfolioPanel.tsx
-│   │   ├── ResearchPanel.tsx
-│   │   └── SettingsPanel.tsx
-│   └── App.tsx          # Terminal Entry Point
-├── install.ps1          # Global Path Injector & Provisioner
-├── run.py               # Root Strategic Orchestrator
-├── finintel.db          # Encrypted SQLite Vault
-└── secret.key           # AES-256 Master Key
+backend/
+  api/
+  config/
+  database/
+  middleware/
+  schemas/
+  security/
+  services/
+  tests/
+src/
+  components/
+  constants/
+  hooks/
+  services/
+  types/
 ```
 
----
+## Validation
 
-## 🛡️ Security & Compliance
-- **Local Sovereignty:** No credentials or portfolio data ever leave your machine.
-- **AES-256 Encryption:** All vaulted secrets are encrypted via the Fernet protocol.
-- **Institutional Ethics:** Designed for professional research and personal strategic analysis.
+- Frontend type check: `npx tsc -p tsconfig.app.json --noEmit`
+- Backend compile check: `python -m compileall backend`
+- Backend tests: `python -m unittest backend.tests.test_app`
 
----
+## Known limits
 
-**FinIntel Terminal v4.7 Build.**
-🛡️💹
+- Market data quality depends on third-party sources and may be delayed
+- Research outputs are heuristic summaries, not analyst-grade recommendations
+- Company due diligence uses external search results for legal, news, blog, and public-commentary context and should be manually reviewed
+- Broker sync is read-only and intended to enrich analytics with holdings, investment value, cash, and PnL context
