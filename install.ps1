@@ -11,10 +11,10 @@ if ($UserPath -notlike "*$InstallPath*") {
     $NewPath = "$UserPath;$InstallPath"
     [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
     $env:Path = $NewPath
-    Write-Host "✅ FinIntel added to system PATH. Restart terminal to use 'finintel' command." -ForegroundColor Cyan
+    Write-Host "--- FinIntel added to system PATH. Restart terminal to use 'finintel' command. ---" -ForegroundColor Cyan
 } else {
-    Write-Host "ℹ️ FinIntel already in system PATH." -ForegroundColor Gray
+    Write-Host "--- FinIntel already in system PATH. ---" -ForegroundColor Gray
 }
 
-Write-Host "🚀 FinIntel Terminal v3.9 Installation Complete." -ForegroundColor Green
-Write-Host "🛡️ Type 'finintel' from any directory to ignite." -ForegroundColor White
+Write-Host "--- FinIntel Terminal v4.0 Installation Complete. ---" -ForegroundColor Green
+Write-Host "--- Type 'finintel' from any directory to ignite. ---" -ForegroundColor White
