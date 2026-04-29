@@ -8,6 +8,7 @@ FinIntel is an Indian market intelligence platform for portfolio monitoring, sec
 - Sector performance heatmap for major Indian indices
 - Portfolio valuation and holding-level PnL tracking
 - Heuristic research summaries and momentum/behavior signals
+- Portfolio-aware research context using holdings, exposure, and available broker cash when read-only sync is enabled
 - Document clause scanning for common legal and risk keywords
 - Compliance, privacy, and risk-disclosure surfaces in the product
 
@@ -16,6 +17,7 @@ FinIntel is an Indian market intelligence platform for portfolio monitoring, sec
 - Frontend: React, TypeScript, Vite
 - Backend: FastAPI with modular routers, schemas, services, and SQLite persistence
 - Data: Yahoo Finance market data and local application records
+- Discovery: DuckDuckGo search for legal, news, blog, and public commentary inputs
 - Session model: short-lived signed application sessions for protected write operations
 
 ## Security and compliance posture
@@ -26,6 +28,7 @@ FinIntel is an Indian market intelligence platform for portfolio monitoring, sec
 - Protected write routes require a signed session token issued by the backend
 - The product includes investment-risk, privacy, and terms disclosures
 - The app is an informational research tool, not a brokerage or personalized advisory service
+- CI is configured with GitHub Actions for type checks, build verification, and backend tests
 
 ## Local development
 
@@ -82,6 +85,7 @@ src/
 - Frontend type check: `npx tsc -p tsconfig.app.json --noEmit`
 - Backend compile check: `python -m compileall backend`
 - Backend tests: `python -m unittest backend.tests.test_app`
+- CI workflow: [`.github/workflows/ci.yml`](/E:/finintel-pro/.github/workflows/ci.yml)
 
 ## Known limits
 
@@ -89,3 +93,4 @@ src/
 - Research outputs are heuristic summaries, not analyst-grade recommendations
 - Company due diligence uses external search results for legal, news, blog, and public-commentary context and should be manually reviewed
 - Broker sync is read-only and intended to enrich analytics with holdings, investment value, cash, and PnL context
+- The current auth model is application-session based and still needs a fuller user/account security model for a true production rollout

@@ -15,7 +15,9 @@ class AppTestCase(unittest.TestCase):
         os.environ["FININTEL_APP_SECRET"] = "test-secret"
 
         from backend.app import create_app
+        from backend.database.db import init_db
 
+        init_db()
         cls.client = TestClient(create_app())
         session_response = cls.client.post("/auth/session")
         cls.session_token = session_response.json()["token"]
@@ -50,6 +52,7 @@ class AppTestCase(unittest.TestCase):
         response = self.client.get("/market/broker/account", headers={"X-Session-Token": self.session_token})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["mode"], "read-only")
+        self.assertEqual(response.headers["X-Process-Time-Ms"] != "", True)
 
     @patch("backend.services.research_service._search_sources")
     def test_company_due_diligence_endpoint(self, mock_search_sources) -> None:
@@ -62,5 +65,10 @@ class AppTestCase(unittest.TestCase):
             [ResearchSource(title="Investor thread", url="https://example.com/social", snippet="bull thesis", source_type="social")],
         ]
         response = self.client.get("/market/company-intel/INFY")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ticker"], "INFY")
+
+    def test_portfolio_context_endpoint(self) -> None:
+        response = self.client.get("/market/portfolio-context/INFY", headers={"X-Session-Token": self.session_token})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["ticker"], "INFY")

@@ -1,6 +1,6 @@
 import { AlertCircle, Zap } from 'lucide-react'
 
-import type { CompanyDueDiligence, DocumentRisk, MarketBehavior, ResearchResult } from '../types/research'
+import type { CompanyDueDiligence, DocumentRisk, MarketBehavior, PortfolioResearchContext, ResearchResult } from '../types/research'
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
@@ -12,6 +12,7 @@ interface Props {
   researchResult: ResearchResult | null
   behavior: MarketBehavior | null
   companyIntel: CompanyDueDiligence | null
+  portfolioContext: PortfolioResearchContext | null
   documentText: string
   setDocumentText: (value: string) => void
   analyzeDocument: () => void
@@ -19,7 +20,7 @@ interface Props {
   documentRisk: DocumentRisk | null
 }
 
-export default function ResearchPanel({ researchTicker, setResearchTicker, runResearch, isResearching, researchResult, behavior, companyIntel, documentText, setDocumentText, analyzeDocument, isAnalyzing, documentRisk }: Props) {
+export default function ResearchPanel({ researchTicker, setResearchTicker, runResearch, isResearching, researchResult, behavior, companyIntel, portfolioContext, documentText, setDocumentText, analyzeDocument, isAnalyzing, documentRisk }: Props) {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-2 gap-8">
@@ -33,6 +34,20 @@ export default function ResearchPanel({ researchTicker, setResearchTicker, runRe
               <div className="flex items-center justify-between"><h2 className="text-3xl font-black italic uppercase">Research Summary</h2><div className={cn('px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest', researchResult.verdict === 'Buy' ? 'bg-emerald-400 text-black' : researchResult.verdict === 'Reduce' ? 'bg-rose-400 text-white' : 'bg-amber-300 text-black')}>{researchResult.verdict}</div></div>
               {behavior && <div className="flex items-center space-x-2 px-4 py-2 bg-white/5 rounded-xl border border-white/10 w-fit"><Zap size={14} className="text-cyan-400" /><span className="text-[10px] font-black uppercase text-cyan-400">{behavior.status}</span></div>}
               <p className="text-sm text-gray-400 leading-relaxed">{researchResult.summary}</p>
+              {portfolioContext && (
+                <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 space-y-3">
+                  <p className="text-[10px] font-black uppercase text-gray-500">Portfolio Context</p>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div><p className="text-[10px] font-black uppercase text-gray-500">Local Qty</p><p className="text-sm font-bold text-white">{portfolioContext.local_holding_quantity}</p></div>
+                    <div><p className="text-[10px] font-black uppercase text-gray-500">Broker Qty</p><p className="text-sm font-bold text-white">{portfolioContext.broker_holding_quantity}</p></div>
+                    <div><p className="text-[10px] font-black uppercase text-gray-500">Cash</p><p className="text-sm font-bold text-white">₹{portfolioContext.available_cash.toLocaleString()}</p></div>
+                    <div><p className="text-[10px] font-black uppercase text-gray-500">Exposure</p><p className="text-sm font-bold text-white">₹{portfolioContext.current_exposure_value.toLocaleString()}</p></div>
+                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed">{portfolioContext.diversification_note}</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">{portfolioContext.deployment_guidance}</p>
+                  {portfolioContext.caution_notes.map((note) => <p key={note} className="text-[11px] text-amber-200/80 leading-relaxed">{note}</p>)}
+                </div>
+              )}
               {companyIntel && (
                 <>
                   <div className="grid grid-cols-3 gap-4">

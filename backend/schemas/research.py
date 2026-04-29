@@ -38,3 +38,14 @@ class CompanyDueDiligence(BaseModel):
     news_signals: list[str]
     blog_signals: list[str]
     sources: list[ResearchSource]
+
+
+class PortfolioResearchContext(BaseModel):
+    ticker: str
+    local_holding_quantity: float
+    broker_holding_quantity: float
+    available_cash: float
+    current_exposure_value: float
+    diversification_note: str
+    deployment_guidance: str
+    caution_notes: list[str]

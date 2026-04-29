@@ -3,7 +3,16 @@ import re
 import yfinance as yf
 from duckduckgo_search import DDGS
 
-from backend.schemas.research import CompanyDueDiligence, DocumentRisk, MarketBehavior, ResearchResult, ResearchSource
+from backend.schemas.research import (
+    CompanyDueDiligence,
+    DocumentRisk,
+    MarketBehavior,
+    PortfolioResearchContext,
+    ResearchResult,
+    ResearchSource,
+)
+from backend.services.broker_service import get_broker_account_summary
+from backend.services.portfolio_service import get_portfolio_summary
 
 
 RISK_PATTERNS = [
@@ -141,4 +150,55 @@ def get_company_due_diligence(ticker: str) -> CompanyDueDiligence:
         news_signals=news_signals,
         blog_signals=blog_signals,
         sources=combined_sources,
+    )
+
+
+def get_portfolio_research_context(ticker: str) -> PortfolioResearchContext:
+    normalized = ticker.strip().upper()
+    local_portfolio = get_portfolio_summary()
+    broker_account = get_broker_account_summary()
+
+    local_holding = next((holding for holding in local_portfolio.holdings if holding.symbol.upper() == normalized), None)
+    broker_holding = next((holding for holding in broker_account.holdings if holding.symbol.upper() == normalized), None)
+
+    local_quantity = float(local_holding.qty if local_holding else 0.0)
+    broker_quantity = float(broker_holding.quantity if broker_holding else 0.0)
+    current_exposure_value = float((local_holding.curr_price * local_holding.qty) if local_holding else 0.0)
+    if broker_holding:
+        current_exposure_value += broker_holding.last_price * broker_holding.quantity
+
+    available_cash = float(broker_account.available_cash if broker_account.status == "connected" else 0.0)
+    has_existing_exposure = (local_quantity + broker_quantity) > 0
+
+    diversification_note = (
+        "This ticker is already present in the tracked portfolio context. Review concentration and overlap before increasing exposure."
+        if has_existing_exposure
+        else "No tracked exposure was found for this ticker in the current local or broker-linked portfolio context."
+    )
+
+    if available_cash > 0 and not has_existing_exposure:
+        deployment_guidance = "Treat this as a watchlist candidate first. If the thesis remains strong after review, consider phased capital deployment rather than a single-entry decision."
+    elif has_existing_exposure:
+        deployment_guidance = "Focus on whether the current position still fits portfolio risk limits, diversification goals, and conviction quality instead of treating the output as a fresh-entry signal."
+    else:
+        deployment_guidance = "Use the research output to compare this company against alternatives before deciding whether it deserves capital allocation at all."
+
+    caution_notes = [
+        "This context is informational and should not be used as an automatic trade decision.",
+        "Broker-linked values, when enabled, are read-only and intended to improve portfolio awareness.",
+    ]
+    if current_exposure_value > 0:
+        caution_notes.append("Existing exposure is present, so concentration and downside correlation matter more than raw upside alone.")
+    if available_cash <= 0:
+        caution_notes.append("No broker cash context is currently available, so sizing guidance is incomplete.")
+
+    return PortfolioResearchContext(
+        ticker=normalized,
+        local_holding_quantity=round(local_quantity, 2),
+        broker_holding_quantity=round(broker_quantity, 2),
+        available_cash=round(available_cash, 2),
+        current_exposure_value=round(current_exposure_value, 2),
+        diversification_note=diversification_note,
+        deployment_guidance=deployment_guidance,
+        caution_notes=caution_notes,
     )

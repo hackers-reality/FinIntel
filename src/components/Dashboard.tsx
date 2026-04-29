@@ -32,6 +32,7 @@ export default function Dashboard() {
     researchResult,
     behavior,
     companyIntel,
+    portfolioContext,
     documentRisk,
     isResearching,
     isAnalyzing,
@@ -107,6 +108,7 @@ export default function Dashboard() {
             researchResult={researchResult}
             behavior={behavior}
             companyIntel={companyIntel}
+            portfolioContext={portfolioContext}
             documentText={documentText}
             setDocumentText={setDocumentText}
             analyzeDocument={analyzeDocument}

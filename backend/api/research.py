@@ -1,8 +1,14 @@
 from fastapi import APIRouter, Depends
 
-from backend.schemas.research import CompanyDueDiligence, DocumentAnalysisRequest, DocumentRisk, MarketBehavior, ResearchResult
+from backend.schemas.research import CompanyDueDiligence, DocumentAnalysisRequest, DocumentRisk, MarketBehavior, PortfolioResearchContext, ResearchResult
 from backend.security.session import require_session
-from backend.services.research_service import analyze_document, get_company_due_diligence, get_market_behavior, get_research
+from backend.services.research_service import (
+    analyze_document,
+    get_company_due_diligence,
+    get_market_behavior,
+    get_portfolio_research_context,
+    get_research,
+)
 
 
 router = APIRouter(tags=["research"])
@@ -21,6 +27,11 @@ def market_behavior(ticker: str) -> MarketBehavior:
 @router.get("/market/company-intel/{ticker}", response_model=CompanyDueDiligence)
 def company_due_diligence(ticker: str) -> CompanyDueDiligence:
     return get_company_due_diligence(ticker)
+
+
+@router.get("/market/portfolio-context/{ticker}", response_model=PortfolioResearchContext, dependencies=[Depends(require_session)])
+def portfolio_research_context(ticker: str) -> PortfolioResearchContext:
+    return get_portfolio_research_context(ticker)
 
 
 @router.post("/analyze/document", response_model=DocumentRisk, dependencies=[Depends(require_session)])

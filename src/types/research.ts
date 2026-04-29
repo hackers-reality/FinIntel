@@ -32,3 +32,14 @@ export interface CompanyDueDiligence {
   blog_signals: string[]
   sources: ResearchSource[]
 }
+
+export interface PortfolioResearchContext {
+  ticker: string
+  local_holding_quantity: number
+  broker_holding_quantity: number
+  available_cash: number
+  current_exposure_value: number
+  diversification_note: string
+  deployment_guidance: string
+  caution_notes: string[]
+}

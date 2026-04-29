@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 
 import { researchService } from '../services/research'
-import type { CompanyDueDiligence, DocumentRisk, MarketBehavior, ResearchResult } from '../types/research'
+import type { CompanyDueDiligence, DocumentRisk, MarketBehavior, PortfolioResearchContext, ResearchResult } from '../types/research'
 
 export function useResearch(sessionToken: string | null) {
   const [researchTicker, setResearchTicker] = useState('RELIANCE')
@@ -9,6 +9,7 @@ export function useResearch(sessionToken: string | null) {
   const [researchResult, setResearchResult] = useState<ResearchResult | null>(null)
   const [behavior, setBehavior] = useState<MarketBehavior | null>(null)
   const [companyIntel, setCompanyIntel] = useState<CompanyDueDiligence | null>(null)
+  const [portfolioContext, setPortfolioContext] = useState<PortfolioResearchContext | null>(null)
   const [documentRisk, setDocumentRisk] = useState<DocumentRisk | null>(null)
   const [isResearching, setIsResearching] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -20,21 +21,26 @@ export function useResearch(sessionToken: string | null) {
     }
     try {
       setIsResearching(true)
-      const [research, marketBehavior, dueDiligence] = await Promise.all([
+      const portfolioContextPromise = sessionToken
+        ? researchService.getPortfolioContext(researchTicker, sessionToken)
+        : Promise.resolve(null)
+      const [research, marketBehavior, dueDiligence, nextPortfolioContext] = await Promise.all([
         researchService.getResearch(researchTicker),
         researchService.getBehavior(researchTicker),
         researchService.getCompanyIntel(researchTicker),
+        portfolioContextPromise,
       ])
       setResearchResult(research)
       setBehavior(marketBehavior)
       setCompanyIntel(dueDiligence)
+      setPortfolioContext(nextPortfolioContext)
       setError(null)
     } catch {
       setError('Unable to run ticker research.')
     } finally {
       setIsResearching(false)
     }
-  }, [researchTicker])
+  }, [researchTicker, sessionToken])
 
   const analyzeDocument = useCallback(async () => {
     if (!sessionToken || !documentText) {
@@ -59,6 +65,7 @@ export function useResearch(sessionToken: string | null) {
     researchResult,
     behavior,
     companyIntel,
+    portfolioContext,
     documentRisk,
     isResearching,
     isAnalyzing,
