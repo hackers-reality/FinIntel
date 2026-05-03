@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Shield } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Shield, Command, BarChart3 } from 'lucide-react'
 
 import { useAuth } from '../hooks/useAuth'
 import { useBroker } from '../hooks/useBroker'
@@ -7,23 +7,28 @@ import { useMarketData } from '../hooks/useMarketData'
 import { usePortfolio } from '../hooks/usePortfolio'
 import { useResearch } from '../hooks/useResearch'
 import { settingsService } from '../services/settings'
+import type { IntentMatch } from '../types/intent-router'
 import type { ComplianceBundle, ProviderSettingStatus, UserSettings } from '../types/settings'
+import type { RiskState } from '../types/risk-engine'
+import CommandPalette from './CommandPalette'
 import MarketDeskPanel from './MarketDeskPanel'
 import PortfolioPanel from './PortfolioPanel'
 import ProviderModal from './ProviderModal'
 import ResearchPanel from './ResearchPanel'
+import RiskPanel from './RiskPanel'
 import SectorPanel from './SectorPanel'
 import SettingsPanel from './SettingsPanel'
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
-type DashboardTab = 'market' | 'sectors' | 'portfolio' | 'research' | 'settings'
+type DashboardTab = 'market' | 'sectors' | 'portfolio' | 'research' | 'settings' | 'risk'
 type ChartMode = 'line' | 'area' | 'candle'
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('market')
   const [chartMode, setChartMode] = useState<ChartMode>('line')
   const [providerModalOpen, setProviderModalOpen] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const { sessionToken, isLoading: isAuthLoading, error: authError } = useAuth()
   const { account: brokerAccount, error: brokerError } = useBroker(sessionToken)
   const {
@@ -63,6 +68,68 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [providers, setProviders] = useState<ProviderSettingStatus[]>([])
   const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [riskState, setRiskState] = useState<RiskState | null>(null)
+
+  useEffect(() => {
+    import('../services/risk-engine').then(({ initRiskEngine, getRiskState: getState }) => {
+      initRiskEngine()
+      setRiskState(getState())
+    })
+  }, [])
+
+  const handleCommand = useCallback((intent: IntentMatch) => {
+    const { action, params } = intent
+
+    switch (action) {
+      case 'research':
+        if (params.ticker) {
+          setActiveTab('research')
+          import('../hooks/useResearch').then(({ useResearch: hook }) => {
+            const { setResearchTicker, runResearch } = hook(sessionToken)
+            setResearchTicker(params.ticker)
+            runResearch()
+          })
+        }
+        break
+      case 'analyze_document':
+        setActiveTab('research')
+        break
+      case 'add_holding':
+        setActiveTab('portfolio')
+        break
+      case 'remove_holding':
+        setActiveTab('portfolio')
+        break
+      case 'check_portfolio':
+        setActiveTab('portfolio')
+        break
+      case 'scan_market':
+        setActiveTab('market')
+        break
+      case 'check_risk':
+        setActiveTab('risk')
+        break
+      case 'switch_tab':
+        if (params.tab && ['market', 'sectors', 'portfolio', 'research', 'settings', 'risk'].includes(params.tab)) {
+          setActiveTab(params.tab as DashboardTab)
+        }
+        break
+      case 'help':
+        setCommandPaletteOpen(true)
+        break
+    }
+  }, [sessionToken])
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setCommandPaletteOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
     void settingsService.getCompliance().then(setCompliance).catch(() => {
@@ -136,10 +203,15 @@ export default function Dashboard() {
           </div>
           <div className={cn('px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest', marketStatus === 'OPEN' ? 'border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_#10b98110]' : 'border-rose-400/30 text-rose-400')}>Market {marketStatus}</div>
         </div>
-        <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
-          {(['market', 'sectors', 'portfolio', 'research', 'settings'] as DashboardTab[]).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-6 py-2 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>{tab}</button>
-          ))}
+        <div className="flex items-center space-x-3">
+          <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
+            {(['market', 'sectors', 'portfolio', 'research', 'risk', 'settings'] as DashboardTab[]).map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>{tab === 'risk' ? <BarChart3 size={12} /> : tab}</button>
+            ))}
+          </div>
+          <button onClick={() => setCommandPaletteOpen(true)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-gray-500 hover:text-white transition-colors" title="Command Palette (Cmd+K)">
+            <Command size={16} />
+          </button>
         </div>
       </nav>
 
@@ -194,6 +266,7 @@ export default function Dashboard() {
             onAcknowledgeRisk={acknowledgeRisk}
           />
         )}
+        {activeTab === 'risk' && riskState && <RiskPanel riskState={riskState} />}
       </main>
 
       <ProviderModal
@@ -202,6 +275,12 @@ export default function Dashboard() {
         onSave={saveProvider}
         onVerify={verifyProvider}
         providers={providers}
+      />
+
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onCommand={handleCommand}
       />
 
       <footer className="py-6 px-10 border-t border-white/5 bg-black/40 backdrop-blur-xl text-center">

@@ -1,5 +1,6 @@
-import { FileText, ShieldCheck } from 'lucide-react'
+import { FileText, ShieldCheck, Cpu } from 'lucide-react'
 
+import { listConfiguredProviders, getRegistryState } from '../services/ai-provider-registry'
 import type { BrokerAccountSummary } from '../types/broker'
 import type { ComplianceBundle, ProviderSettingStatus, UserSettings } from '../types/settings'
 
@@ -60,6 +61,42 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
                 <p className="mt-1 text-[10px] text-gray-500">{provider.verification_message ?? 'No verification message yet.'}</p>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+          <div className="flex items-center space-x-3">
+            <Cpu size={18} className="text-cyan-400" />
+            <p className="text-xs font-bold text-cyan-400 uppercase">AI Provider Registry</p>
+          </div>
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            Multi-provider support with role-based routing. Configure once, use across research, analysis, and document review.
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {(() => {
+              try {
+                const configured = listConfiguredProviders()
+                const registry = getRegistryState()
+                return (
+                  <>
+                    <div className="p-3 bg-black/20 rounded-xl">
+                      <p className="text-[10px] font-black uppercase text-gray-500">Configured</p>
+                      <p className="text-lg font-black text-white">{configured.length}</p>
+                    </div>
+                    <div className="p-3 bg-black/20 rounded-xl">
+                      <p className="text-[10px] font-black uppercase text-gray-500">Preferred</p>
+                      <p className="text-sm font-bold text-white capitalize">{registry.preferred}</p>
+                    </div>
+                    <div className="p-3 bg-black/20 rounded-xl">
+                      <p className="text-[10px] font-black uppercase text-gray-500">Available</p>
+                      <p className="text-lg font-black text-white">{providers.length + 8}</p>
+                    </div>
+                  </>
+                )
+              } catch {
+                return <p className="text-xs text-gray-500 col-span-3">Registry not initialized</p>
+              }
+            })()}
           </div>
         </div>
 
