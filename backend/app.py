@@ -14,11 +14,14 @@ from backend.api.broker import router as broker_router
 from backend.api.compliance import router as compliance_router
 from backend.api.market import router as market_router
 from backend.api.portfolio import router as portfolio_router
+from backend.api.premium import router as premium_router
 from backend.api.research import router as research_router
 from backend.api.settings import router as settings_router
 from backend.config.settings import get_settings
 from backend.database.db import get_connection, init_db
 from backend.middleware.rate_limit import limiter
+from backend.middleware.security import SecurityHeadersMiddleware
+from backend.services.ws_service import market_data_stream_task, ws_endpoint
 
 
 logging.basicConfig(level=logging.INFO)
@@ -29,21 +32,26 @@ logger = logging.getLogger("finintel.api")
 async def lifespan(_: FastAPI):
     init_db()
     logger.info("FinIntel API started.")
+    import asyncio
+    asyncio.create_task(market_data_stream_task())
     yield
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     app.add_middleware(SlowAPIMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_methods=["GET", "POST", "PUT", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Session-Token"],
     )
+
     app.include_router(auth_router)
     app.include_router(broker_router)
     app.include_router(market_router)
@@ -51,6 +59,9 @@ def create_app() -> FastAPI:
     app.include_router(research_router)
     app.include_router(settings_router)
     app.include_router(compliance_router)
+    app.include_router(premium_router)
+
+    app.add_api_websocket_route("/ws", ws_endpoint)
 
     @app.middleware("http")
     async def request_context_middleware(request: Request, call_next):

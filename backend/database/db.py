@@ -2,16 +2,34 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Iterator
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+
 from backend.config.settings import get_settings
 
+Base = declarative_base()
 
-def get_connection() -> sqlite3.Connection:
-    connection = sqlite3.connect(get_settings().database_path)
-    connection.row_factory = sqlite3.Row
-    return connection
+_settings = get_settings()
+engine = create_engine(_settings.database_url, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db() -> Iterator[Session]:
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def init_db() -> None:
+    import backend.models.user
+    Base.metadata.create_all(bind=engine)
+
     with get_connection() as connection:
         cursor = connection.cursor()
         cursor.execute(
@@ -91,7 +109,22 @@ def init_db() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS revoked_tokens (
+                id INTEGER PRIMARY KEY,
+                jti TEXT UNIQUE NOT NULL,
+                revoked_at TEXT NOT NULL
+            )
+            """
+        )
         connection.commit()
+
+
+def get_connection() -> sqlite3.Connection:
+    connection = sqlite3.connect(get_settings().database_path)
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
 @contextmanager

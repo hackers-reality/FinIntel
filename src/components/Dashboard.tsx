@@ -6,6 +6,7 @@ import { useBroker } from '../hooks/useBroker'
 import { useMarketData } from '../hooks/useMarketData'
 import { usePortfolio } from '../hooks/usePortfolio'
 import { useResearch } from '../hooks/useResearch'
+import { getRiskState, initRiskEngine } from '../services/risk-engine'
 import { settingsService } from '../services/settings'
 import type { IntentMatch } from '../types/intent-router'
 import type { ComplianceBundle, ProviderSettingStatus, UserSettings } from '../types/settings'
@@ -71,10 +72,8 @@ export default function Dashboard() {
   const [riskState, setRiskState] = useState<RiskState | null>(null)
 
   useEffect(() => {
-    import('../services/risk-engine').then(({ initRiskEngine, getRiskState: getState }) => {
-      initRiskEngine()
-      setRiskState(getState())
-    })
+    initRiskEngine()
+    setRiskState(getRiskState())
   }, [])
 
   const handleCommand = useCallback((intent: IntentMatch) => {
@@ -84,11 +83,6 @@ export default function Dashboard() {
       case 'research':
         if (params.ticker) {
           setActiveTab('research')
-          import('../hooks/useResearch').then(({ useResearch: hook }) => {
-            const { setResearchTicker, runResearch } = hook(sessionToken)
-            setResearchTicker(params.ticker)
-            runResearch()
-          })
         }
         break
       case 'analyze_document':
