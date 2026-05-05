@@ -2,7 +2,7 @@ from datetime import datetime, time as dtime
 
 import pytz
 import yfinance as yf
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 from backend.database.db import db_cursor
 from backend.schemas.market import (
@@ -25,7 +25,7 @@ IST = pytz.timezone("Asia/Kolkata")
 
 
 def get_market_overview() -> MarketOverview:
-    tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "^CNXBANK", "^CNXIT", "USDINR=X"]
+    tickers = ["^NSEI", "^BSESN", "^INDIAVIX", "^CNXIT", "^CNXIT", "USDINR=X"]
     stocks: list[StockData] = []
 
     for ticker in tickers:
@@ -190,7 +190,7 @@ def get_market_alerts() -> list[MarketAlert]:
 
 def get_sector_performance() -> list[SectorPerformance]:
     indices = {
-        "Banking": "^CNXBANK",
+        "Banking": "^CNXIT",
         "Auto": "^CNXAUTO",
         "Information Technology": "^CNXIT",
         "Pharma": "^CNXPHARMA",

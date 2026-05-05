@@ -100,6 +100,42 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
           </div>
         </div>
 
+        <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+          <p className="text-xs font-bold text-cyan-400 uppercase">Environment Keys</p>
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            API keys loaded from <code className="text-cyan-400">.env</code> file (read-only, shown only if present).
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {(() => {
+              const envKeys = [
+                { name: 'NVIDIA NIM', key: 'NVIDIA_NIM_API_KEY', envKey: 'nvidia_nim_api_key' },
+                { name: 'OpenAI', key: 'OPENAI_API_KEY', envKey: 'openai_api_key' },
+                { name: 'Alpha Vantage', key: 'ALPHA_VANTAGE_API_KEY', envKey: 'alpha_vantage_api_key' },
+                { name: 'Polygon', key: 'POLYGON_API_KEY', envKey: 'polygon_api_key' },
+              ]
+              const params = new URLSearchParams(window.location.search)
+              const showEnv = params.get('debug') === 'env'
+              if (!showEnv) {
+                return (
+                  <p className="text-[10px] text-gray-500 col-span-2">
+                    Add <code className="text-cyan-400">?debug=env</code> to URL to view env keys status.
+                  </p>
+                )
+              }
+              return envKeys.map(({ name, key, envKey }) => {
+                const stored = localStorage.getItem(`ai_key_${envKey}`)
+                const masked = stored ? `${stored.slice(0, 8)}...${stored.slice(-4)}` : 'Not configured'
+                return (
+                  <div key={key} className="p-3 bg-black/20 rounded-xl">
+                    <p className="text-[10px] font-black uppercase text-gray-500">{name}</p>
+                    <p className="text-xs font-bold text-white truncate">{masked}</p>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </div>
+
         <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-3">
           <p className="text-xs font-bold text-cyan-400 uppercase">Broker account intelligence</p>
           <p className="text-[10px] text-gray-400 leading-relaxed">

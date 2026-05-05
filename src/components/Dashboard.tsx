@@ -112,7 +112,7 @@ export default function Dashboard() {
         setCommandPaletteOpen(true)
         break
     }
-  }, [sessionToken])
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
