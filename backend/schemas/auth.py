@@ -1,6 +1,7 @@
 from datetime import datetime
+from re import match
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class AuthSession(BaseModel):
@@ -10,9 +11,26 @@ class AuthSession(BaseModel):
     capabilities: list[str]
 
 
+def _validate_password(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if not any(c.isupper() for c in v):
+        raise ValueError("Password must contain an uppercase letter")
+    if not any(c.isdigit() for c in v):
+        raise ValueError("Password must contain a number")
+    if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in v):
+        raise ValueError("Password must contain a special character")
+    return v
+
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        return _validate_password(v)
 
 
 class UserLogin(BaseModel):
@@ -52,3 +70,8 @@ class UserProfile(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        return _validate_password(v)

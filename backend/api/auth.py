@@ -1,10 +1,12 @@
 import json
+from datetime import datetime, timezone
 from typing import Generator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from slowapi import Limiter
 from sqlalchemy.orm import Session
 
-from backend.database.db import get_db
+from backend.database.db import SessionLocal, get_db
 from backend.models.user import User, UserRole
 from backend.schemas.auth import (
     AuthSession,
@@ -24,7 +26,27 @@ from backend.security.session import create_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_revoked_tokens: set[str] = set()
+limiter = Limiter(key_func=lambda request: request.client.host if request and request.client else "unknown")
+
+_revoked_tokens_set: set[str] = set()
+
+
+def _is_token_revoked(token: str) -> bool:
+    if token in _revoked_tokens_set:
+        return True
+    db = SessionLocal()
+    try:
+        from backend.database.db import engine
+        from sqlalchemy import text
+        result = db.execute(
+            text("SELECT 1 FROM revoked_tokens WHERE jti = :token"),
+            {"token": token},
+        )
+        return result.first() is not None
+    except Exception:
+        return False
+    finally:
+        db.close()
 
 
 def get_current_user(
@@ -34,7 +56,7 @@ def get_current_user(
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid Authorization header.")
     token = authorization.split(" ", 1)[1]
-    if token in _revoked_tokens:
+    if _is_token_revoked(token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked.")
     payload = decode_access_token(token)
     user = db.query(User).filter(User.id == int(payload["sub"])).first()
@@ -56,7 +78,8 @@ def issue_session() -> AuthSession:
 
 
 @router.post("/register", response_model=UserProfile, status_code=status.HTTP_201_CREATED)
-def register(payload: UserRegister, db: Session = Depends(get_db)) -> UserProfile:
+@limiter.limit("5/minute")
+def register(request: Request, payload: UserRegister, db: Session = Depends(get_db)) -> UserProfile:
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered.")
@@ -78,7 +101,8 @@ def register(payload: UserRegister, db: Session = Depends(get_db)) -> UserProfil
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit("10/minute")
+def login(request: Request, payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
@@ -95,8 +119,9 @@ def login(payload: UserLogin, db: Session = Depends(get_db)) -> TokenResponse:
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh_tokens(payload: TokenRefresh, db: Session = Depends(get_db)) -> TokenResponse:
-    if payload.refresh_token in _revoked_tokens:
+@limiter.limit("10/minute")
+def refresh_tokens(request: Request, payload: TokenRefresh, db: Session = Depends(get_db)) -> TokenResponse:
+    if _is_token_revoked(payload.refresh_token):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token has been revoked.")
     payload_data = decode_refresh_token(payload.refresh_token)
     user = db.query(User).filter(User.id == int(payload_data["sub"])).first()
@@ -108,8 +133,15 @@ def refresh_tokens(payload: TokenRefresh, db: Session = Depends(get_db)) -> Toke
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(payload: TokenRefresh) -> None:
-    _revoked_tokens.add(payload.refresh_token)
+@limiter.limit("10/minute")
+def logout(request: Request, payload: TokenRefresh, db: Session = Depends(get_db)) -> None:
+    _revoked_tokens_set.add(payload.refresh_token)
+    from sqlalchemy import text
+    db.execute(
+        text("INSERT OR IGNORE INTO revoked_tokens (jti, revoked_at) VALUES (:token, :ts)"),
+        {"token": payload.refresh_token, "ts": datetime.now(timezone.utc).isoformat()},
+    )
+    db.commit()
 
 
 @router.post("/mfa/enable", response_model=MFASetup)

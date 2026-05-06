@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Shield, Command, BarChart3 } from 'lucide-react'
+import { Shield, Command, BarChart3, MessageSquare } from 'lucide-react'
 
 import { useAuth } from '../hooks/useAuth'
 import { useBroker } from '../hooks/useBroker'
@@ -19,10 +19,13 @@ import ResearchPanel from './ResearchPanel'
 import RiskPanel from './RiskPanel'
 import SectorPanel from './SectorPanel'
 import SettingsPanel from './SettingsPanel'
+import AIChat from './AIChat'
+import LoginForm from './LoginForm'
+import RegisterForm from './RegisterForm'
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
-type DashboardTab = 'market' | 'sectors' | 'portfolio' | 'research' | 'settings' | 'risk'
+type DashboardTab = 'market' | 'sectors' | 'portfolio' | 'research' | 'settings' | 'risk' | 'chat'
 type ChartMode = 'line' | 'area' | 'candle'
 
 export default function Dashboard() {
@@ -30,8 +33,10 @@ export default function Dashboard() {
   const [chartMode, setChartMode] = useState<ChartMode>('line')
   const [providerModalOpen, setProviderModalOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-  const { sessionToken, isLoading: isAuthLoading, error: authError } = useAuth()
-  const { account: brokerAccount, error: brokerError } = useBroker(sessionToken)
+  const [showRegister, setShowRegister] = useState(false)
+  const { user, isAuthenticated, isLoading: isAuthLoading, error: authError, login, register, logout } = useAuth()
+  const accessToken = typeof window !== 'undefined' ? localStorage.getItem('finintel_access_token') : null
+  const { account: brokerAccount, error: brokerError } = useBroker(isAuthenticated ? accessToken : null)
   const {
     overview,
     quotes,
@@ -48,7 +53,7 @@ export default function Dashboard() {
     isLoading: isMarketLoading,
     error: marketError,
   } = useMarketData()
-  const { portfolio, newHolding, setNewHolding, addHolding, error: portfolioError } = usePortfolio(sessionToken)
+  const { portfolio, newHolding, setNewHolding, addHolding, error: portfolioError } = usePortfolio(isAuthenticated ? accessToken : null)
   const {
     researchTicker,
     setResearchTicker,
@@ -64,7 +69,7 @@ export default function Dashboard() {
     error: researchError,
     runResearch,
     analyzeDocument,
-  } = useResearch(sessionToken)
+  } = useResearch(isAuthenticated ? accessToken : null)
   const [compliance, setCompliance] = useState<ComplianceBundle | null>(null)
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [providers, setProviders] = useState<ProviderSettingStatus[]>([])
@@ -104,7 +109,7 @@ export default function Dashboard() {
         setActiveTab('risk')
         break
       case 'switch_tab':
-        if (params.tab && ['market', 'sectors', 'portfolio', 'research', 'settings', 'risk'].includes(params.tab)) {
+        if (params.tab && ['market', 'sectors', 'portfolio', 'research', 'settings', 'risk', 'chat'].includes(params.tab)) {
           setActiveTab(params.tab as DashboardTab)
         }
         break
@@ -132,29 +137,23 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    if (!sessionToken) {
-      return
-    }
-    void settingsService.getSettings(sessionToken).then(setSettings).catch(() => {
+    if (!isAuthenticated || !accessToken) return
+    void settingsService.getSettings(accessToken).then(setSettings).catch(() => {
       setSettingsError('Unable to load user settings.')
     })
-  }, [sessionToken])
+  }, [isAuthenticated, accessToken])
 
   useEffect(() => {
-    if (!sessionToken) {
-      return
-    }
-    void settingsService.listProviders(sessionToken).then(setProviders).catch(() => {
+    if (!isAuthenticated || !accessToken) return
+    void settingsService.listProviders(accessToken).then(setProviders).catch(() => {
       setSettingsError('Unable to load provider settings.')
     })
-  }, [sessionToken])
+  }, [isAuthenticated, accessToken])
 
   async function acknowledgeRisk() {
-    if (!sessionToken) {
-      return
-    }
+    if (!isAuthenticated || !accessToken) return
     try {
-      const updatedSettings = await settingsService.updateSettings({ risk_acknowledged: true }, sessionToken)
+      const updatedSettings = await settingsService.updateSettings({ risk_acknowledged: true }, accessToken)
       setSettings(updatedSettings)
       setSettingsError(null)
     } catch {
@@ -163,10 +162,8 @@ export default function Dashboard() {
   }
 
   async function saveProvider(payload: Parameters<typeof settingsService.saveProvider>[0]) {
-    if (!sessionToken) {
-      return
-    }
-    const next = await settingsService.saveProvider(payload, sessionToken)
+    if (!isAuthenticated || !accessToken) return
+    const next = await settingsService.saveProvider(payload, accessToken)
     setProviders((current) => {
       const filtered = current.filter((item) => item.provider !== next.provider)
       return [...filtered, next].sort((left, right) => left.provider.localeCompare(right.provider))
@@ -174,18 +171,65 @@ export default function Dashboard() {
   }
 
   async function verifyProvider(provider: string) {
-    if (!sessionToken) {
-      return
-    }
-    const next = await settingsService.verifyProvider(provider, sessionToken)
+    if (!isAuthenticated || !accessToken) return
+    const next = await settingsService.verifyProvider(provider, accessToken)
     setProviders((current) => {
       const filtered = current.filter((item) => item.provider !== next.provider)
       return [...filtered, next].sort((left, right) => left.provider.localeCompare(right.provider))
     })
   }
 
+  async function handleAskAI(question: string, context?: string): Promise<string> {
+    if (!isAuthenticated || !accessToken) return 'Please log in to use AI features.'
+    try {
+      const response = await fetch(`${window.location.origin.replace(':3000', ':8008')}/api/research/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ question, context: context || '' }),
+      })
+      if (!response.ok) throw new Error('Failed to get AI response')
+      const data = await response.json()
+      return data.answer || 'No response received.'
+    } catch {
+      return 'I apologize, but I encountered an error connecting to the AI service. Please try again.'
+    }
+  }
+
   const surfaceError = authError ?? brokerError ?? marketError ?? portfolioError ?? researchError ?? settingsError
   const marketStatus = overview?.market_status ?? 'CLOSED'
+
+  if (!isAuthenticated) {
+    return showRegister ? (
+      <RegisterForm
+        onRegister={async (email, password) => {
+          try {
+            await register(email, password)
+          } catch {
+            throw new Error('Registration failed')
+          }
+        }}
+        onSwitchToLogin={() => setShowRegister(false)}
+        isLoading={isAuthLoading}
+        error={authError}
+      />
+    ) : (
+      <LoginForm
+        onLogin={async (email, password, mfaCode) => {
+          try {
+            await login(email, password, mfaCode)
+          } catch {
+            throw new Error('Login failed')
+          }
+        }}
+        onSwitchToRegister={() => setShowRegister(true)}
+        isLoading={isAuthLoading}
+        error={authError}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col">
@@ -199,12 +243,17 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center space-x-3">
           <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
-            {(['market', 'sectors', 'portfolio', 'research', 'risk', 'settings'] as DashboardTab[]).map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>{tab === 'risk' ? <BarChart3 size={12} /> : tab}</button>
+            {(['market', 'sectors', 'portfolio', 'research', 'chat', 'risk', 'settings'] as DashboardTab[]).map((tab) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>
+                {tab === 'risk' ? <BarChart3 size={12} /> : tab === 'chat' ? <MessageSquare size={12} /> : tab}
+              </button>
             ))}
           </div>
           <button onClick={() => setCommandPaletteOpen(true)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-gray-500 hover:text-white transition-colors" title="Command Palette (Cmd+K)">
             <Command size={16} />
+          </button>
+          <button onClick={logout} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase text-gray-500 hover:text-white transition-colors">
+            Logout
           </button>
         </div>
       </nav>
@@ -248,6 +297,17 @@ export default function Dashboard() {
             analyzeDocument={analyzeDocument}
             isAnalyzing={isAnalyzing}
             documentRisk={documentRisk}
+          />
+        )}
+        {activeTab === 'chat' && (
+          <AIChat
+            ticker={selectedSymbol}
+            researchResult={researchResult}
+            behavior={behavior}
+            companyIntel={companyIntel}
+            documentRisk={documentRisk}
+            onAskQuestion={handleAskAI}
+            isLoading={isResearching}
           />
         )}
         {activeTab === 'settings' && (

@@ -1,7 +1,7 @@
 fastapi
 uvicorn
 yfinance
-duckduckgo_search
+ddgs
 python-dotenv
 openai
 cryptography
@@ -12,5 +12,4 @@ pyjwt>=2.8.0
 bcrypt>=4.1.0
 pyotp>=2.9.0
 sqlalchemy>=2.0.0
-passlib[bcrypt]>=1.7.4
 email-validator>=2.1.0

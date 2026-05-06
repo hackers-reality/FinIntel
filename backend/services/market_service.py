@@ -182,7 +182,7 @@ def get_market_alerts() -> list[MarketAlert]:
                 title=news_item.title[:90],
                 severity="info",
                 description="Market news surfaced from public search sources.",
-                source="duckduckgo",
+                source="ddgs",
             )
         )
     return alerts[:12]

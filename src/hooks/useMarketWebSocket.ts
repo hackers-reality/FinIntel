@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { getStoredAccessToken } from '../services/auth'
+
 interface MarketUpdate {
   symbol: string
   data: Record<string, unknown>
@@ -26,8 +28,10 @@ export function useMarketWebSocket(symbols: string[] = [], autoReconnect = true)
   const maxReconnectAttempts = 5
 
   const connect = useCallback(() => {
+    const token = getStoredAccessToken()
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.hostname}:8008/ws`
+    const query = token ? `?token=${encodeURIComponent(token)}` : ''
+    const wsUrl = `${protocol}//${window.location.hostname}:8008/ws${query}`
 
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
@@ -62,8 +66,12 @@ export function useMarketWebSocket(symbols: string[] = [], autoReconnect = true)
       }
     }
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setState((prev) => ({ ...prev, isConnected: false }))
+      if (event.code === 4003) {
+        setState((prev) => ({ ...prev, error: 'Authentication required for market data.' }))
+        return
+      }
       if (autoReconnect && reconnectAttempts.current < maxReconnectAttempts) {
         const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
         reconnectTimer.current = setTimeout(() => {

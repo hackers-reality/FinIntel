@@ -7,10 +7,28 @@ import yfinance as yf
 from fastapi import WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
+from backend.security.jwt import decode_access_token
+from backend.api.auth import _revoked_tokens_set, _is_token_revoked
+
 logger = logging.getLogger("finintel.ws")
 
 _clients: set[WebSocket] = set()
 _market_cache: dict[str, object] = {}
+
+
+async def _verify_ws_token(websocket: WebSocket) -> bool:
+    token = websocket.query_params.get("token") or websocket.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return False
+    if token in _revoked_tokens_set:
+        return False
+    if _is_token_revoked(token):
+        return False
+    try:
+        decode_access_token(token)
+        return True
+    except Exception:
+        return False
 
 
 async def broadcast(event_type: str, payload: dict) -> None:
@@ -29,6 +47,9 @@ async def broadcast(event_type: str, payload: dict) -> None:
 
 
 async def ws_endpoint(websocket: WebSocket) -> None:
+    if not await _verify_ws_token(websocket):
+        await websocket.close(code=4003, reason="Unauthorized")
+        return
     await websocket.accept()
     _clients.add(websocket)
     logger.info("WebSocket client connected. Total: %d", len(_clients))

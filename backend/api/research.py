@@ -1,39 +1,59 @@
-from fastapi import APIRouter, Depends
+import json
+from typing import Generator
 
-from backend.schemas.research import CompanyDueDiligence, DocumentAnalysisRequest, DocumentRisk, MarketBehavior, PortfolioResearchContext, ResearchResult
-from backend.security.session import require_session
-from backend.services.research_service import (
-    analyze_document,
-    get_company_due_diligence,
-    get_market_behavior,
-    get_portfolio_research_context,
-    get_research,
-)
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from backend.database.db import get_db
+from backend.security.jwt import decode_access_token
+from backend.services.research_service import research_engine
 
-router = APIRouter(tags=["research"])
+router = APIRouter(prefix="/research", tags=["research"])
 
 
-@router.get("/market/research/{ticker}", response_model=ResearchResult)
-def market_research(ticker: str) -> ResearchResult:
-    return get_research(ticker)
+class AskQuestion(BaseModel):
+    question: str
+    context: str = ""
 
 
-@router.get("/market/behavior/{ticker}", response_model=MarketBehavior)
-def market_behavior(ticker: str) -> MarketBehavior:
-    return get_market_behavior(ticker)
+@router.post("/ask")
+async def ask_question(payload: AskQuestion, request: Request, db: Session = Depends(get_db)) -> dict:
+    """AI chat endpoint for conversational research."""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization.")
+
+    token = auth_header.split(" ", 1)[1]
+    try:
+        payload_data = decode_access_token(token)
+        user_id = int(payload_data["sub"])
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token.")
+
+    try:
+        answer = research_engine.ask_question(payload.question, payload.context)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="AI service error.") from e
 
 
-@router.get("/market/company-intel/{ticker}", response_model=CompanyDueDiligence)
-def company_due_diligence(ticker: str) -> CompanyDueDiligence:
-    return get_company_due_diligence(ticker)
+@router.post("/analyze")
+async def analyze_ticker(ticker: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    """Deep research analysis for a ticker."""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization.")
 
+    token = auth_header.split(" ", 1)[1]
+    try:
+        payload_data = decode_access_token(token)
+        user_id = int(payload_data["sub"])
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token.")
 
-@router.get("/market/portfolio-context/{ticker}", response_model=PortfolioResearchContext, dependencies=[Depends(require_session)])
-def portfolio_research_context(ticker: str) -> PortfolioResearchContext:
-    return get_portfolio_research_context(ticker)
-
-
-@router.post("/analyze/document", response_model=DocumentRisk, dependencies=[Depends(require_session)])
-def document_analysis(payload: DocumentAnalysisRequest) -> DocumentRisk:
-    return analyze_document(payload.text)
+    try:
+        result = research_engine.analyze_ticker(ticker)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Research failed.") from e
