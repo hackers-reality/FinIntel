@@ -2,12 +2,54 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from datetime import datetime
 
 from backend.config.settings import get_settings
 
 Base = declarative_base()
+
+
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String, index=True)
+    role = Column(String)  # 'user' or 'assistant'
+    content = Column(Text)
+    provider = Column(String)  # which LLM responded
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+class SemanticMemory(Base):
+    __tablename__ = "semantic_memory"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String, unique=True, index=True)
+    value = Column(Text)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ResearchHistory(Base):
+    __tablename__ = "research_history"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    query = Column(Text)
+    ticker = Column(String, nullable=True)
+    report = Column(Text)
+    provider = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SavedOpportunity(Base):
+    __tablename__ = "saved_opportunities"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String, index=True)
+    thesis = Column(Text)
+    entry_price = Column(Float, nullable=True)
+    target_price = Column(Float, nullable=True)
+    stop_loss = Column(Float, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 
 _settings = get_settings()
 engine = create_engine(_settings.database_url, pool_pre_ping=True)

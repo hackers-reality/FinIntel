@@ -23,6 +23,7 @@ from backend.services.market_service import (
     get_market_overview,
     get_market_quotes,
     get_sector_performance,
+    get_ticker_indicators,
 )
 
 
@@ -81,3 +82,27 @@ def market_events() -> list[MarketEvent]:
 @router.get("/alerts", response_model=list[MarketAlert])
 def market_alerts() -> list[MarketAlert]:
     return get_market_alerts()
+
+
+@router.get("/indicators/{symbol}")
+def market_indicators(symbol: str) -> dict:
+    return get_ticker_indicators(symbol)
+
+
+api_market_router = APIRouter(prefix="/api/market", tags=["market"])
+
+@api_market_router.get("/overview", response_model=MarketOverview)
+def api_market_overview() -> MarketOverview:
+    return get_market_overview()
+
+@api_market_router.get("/quotes", response_model=list[MarketQuote])
+def api_market_quotes(tickers: str = Query(default=None)) -> list[MarketQuote]:
+    return get_market_quotes()
+
+@api_market_router.get("/chart", response_model=MarketChartSeries)
+def api_market_chart(
+    ticker: str = Query(...),
+    period: str = Query(default="1mo"),
+    interval: str = Query(default="1d"),
+) -> MarketChartSeries:
+    return get_market_chart(ticker, period=period, interval=interval)

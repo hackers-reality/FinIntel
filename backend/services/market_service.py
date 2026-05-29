@@ -47,18 +47,20 @@ def get_market_overview() -> MarketOverview:
 
 def get_market_quotes() -> list[MarketQuote]:
     watchlist = {
+        "^NSEI": "Nifty 50",
+        "^BSESN": "S&P BSE SENSEX",
+        "^INDIAVIX": "India VIX",
         "RELIANCE.NS": "Reliance Industries",
         "TCS.NS": "Tata Consultancy Services",
         "INFY.NS": "Infosys",
         "HDFCBANK.NS": "HDFC Bank",
-        "ICICIBANK.NS": "ICICI Bank",
-        "SBIN.NS": "State Bank of India",
-        "AXISBANK.NS": "Axis Bank",
-        "ITC.NS": "ITC",
         "USDINR=X": "USD/INR",
         "EURINR=X": "EUR/INR",
-        "GBPINR=X": "GBP/INR",
-        "JPYINR=X": "JPY/INR",
+        "BTC-USD": "Bitcoin",
+        "ETH-USD": "Ethereum",
+        "SHIB-USD": "Shiba Inu",
+        "DOGE-USD": "Dogecoin",
+        "SOL-USD": "Solana",
     }
     quotes: list[MarketQuote] = []
     for ticker, label in watchlist.items():
@@ -71,7 +73,14 @@ def get_market_quotes() -> list[MarketQuote]:
             volume = float(history["Volume"].iloc[-1]) if "Volume" in history else 0.0
             change = round(close_price - open_price, 2)
             change_percent = round((change / open_price) * 100, 2) if open_price else 0.0
-            category = "currency" if "=X" in ticker else "stock"
+            if "=X" in ticker:
+                category = "currency"
+            elif "-USD" in ticker:
+                category = "crypto"
+            elif "^" in ticker:
+                category = "index"
+            else:
+                category = "stock"
             quotes.append(
                 MarketQuote(
                     symbol=ticker,
@@ -215,6 +224,60 @@ def get_sector_performance() -> list[SectorPerformance]:
 
 
 def get_investor_news() -> list[InvestorNews]:
+    # Check if we have news in the DB
+    with db_cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) as cnt FROM investor_news")
+        cnt = cursor.fetchone()["cnt"]
+
+    if cnt == 0:
+        try:
+            from ddgs import DDGS
+            titans = ["Vijay Kedia", "Ashish Kacholia", "Mukul Agrawal", "Rakesh Jhunjhunwala"]
+            all_news = []
+            with DDGS() as ddgs:
+                for titan in titans:
+                    query = f"{titan} stock pick investment"
+                    results = list(ddgs.news(query, max_results=3, timelimit='d'))
+                    for r in results:
+                        title = r.get('title') or ''
+                        snippet = r.get('body') or ''
+                        full_title = f"{title} - {snippet}" if snippet else title
+                        all_news.append({
+                            "investor_name": titan,
+                            "title": full_title,
+                            "url": r.get('url') or '',
+                            "ts": datetime.now(IST).isoformat()
+                        })
+            
+            if not all_news:
+                print("DDGS news empty or blocked, falling back to yfinance feeds...")
+                for ticker in ["^NSEI", "RELIANCE.NS", "BTC-USD"]:
+                    try:
+                        ticker_news = yf.Ticker(ticker).news
+                        for n in ticker_news[:4]:
+                            title = n.get('title') or ''
+                            publisher = n.get('publisher') or 'Market Feed'
+                            all_news.append({
+                                "investor_name": "Market News Feed",
+                                "title": f"{title} - {publisher}",
+                                "url": n.get('link') or '',
+                                "ts": datetime.now(IST).isoformat()
+                            })
+                    except Exception as yf_err:
+                        print(f"Error fetching yfinance fallback news for {ticker}: {yf_err}")
+            
+            if all_news:
+                with db_cursor() as cursor:
+                    for item in all_news:
+                        cursor.execute("SELECT id FROM investor_news WHERE url = ?", (item["url"],))
+                        if not cursor.fetchone():
+                            cursor.execute(
+                                "INSERT INTO investor_news (investor_name, title, url, ts) VALUES (?, ?, ?, ?)",
+                                (item["investor_name"], item["title"], item["url"], item["ts"])
+                            )
+        except Exception as e:
+            print(f"Error fetching initial investor news: {e}")
+
     with db_cursor() as cursor:
         cursor.execute("SELECT investor_name, title, url, ts FROM investor_news ORDER BY ts DESC LIMIT 15")
         rows = cursor.fetchall()
@@ -260,3 +323,94 @@ def get_market_events() -> list[MarketEvent]:
         )
         for row in rows
     ]
+
+
+async def get_quote(ticker: str) -> dict:
+    import yfinance as yf
+    import asyncio
+
+    def _fetch():
+        t = yf.Ticker(ticker)
+        hist = t.history(period="1d")
+        if hist.empty:
+            return {}
+        info = {}
+        try:
+            info = t.info
+        except Exception:
+            pass
+
+        close_val = float(hist["Close"].iloc[-1])
+        open_val = float(hist["Open"].iloc[-1])
+        volume = float(hist["Volume"].iloc[-1]) if "Volume" in hist else 0.0
+
+        return {
+            "symbol": ticker,
+            "price": round(close_val, 2),
+            "open": round(open_val, 2),
+            "volume": volume,
+            "name": info.get("longName") or info.get("shortName") or ticker,
+            "sector": info.get("sector") or "Unknown",
+            "industry": info.get("industry") or "Unknown",
+            "summary": info.get("longBusinessSummary") or "",
+            "market_cap": info.get("marketCap") or 0.0,
+        }
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _fetch)
+
+
+async def get_history(ticker: str, period: str = "3mo") -> list[dict]:
+    import yfinance as yf
+    import asyncio
+
+    def _fetch():
+        t = yf.Ticker(ticker)
+        hist = t.history(period=period)
+        if hist.empty:
+            return []
+        points = []
+        for timestamp, row in hist.iterrows():
+            points.append({
+                "date": timestamp.strftime("%Y-%m-%d") if hasattr(timestamp, "strftime") else str(timestamp),
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "close": round(float(row["Close"]), 2),
+                "volume": float(row["Volume"]) if "Volume" in row else 0.0
+            })
+        return points
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _fetch)
+
+
+def get_ticker_indicators(symbol: str) -> dict:
+    normalized = symbol.strip().upper()
+    try:
+        # Fetch 3 months of history for technical indicators calculation
+        history = yf.Ticker(normalized).history(period="3mo")
+        if history.empty:
+            return {
+                "signal": "HOLD",
+                "score": 0,
+                "rsi": 50.0,
+                "stop_loss": 0.0,
+                "take_profit": 0.0,
+                "details": f"No history found for {symbol}."
+            }
+        highs = history["High"].tolist()
+        lows = history["Low"].tolist()
+        closes = history["Close"].tolist()
+        
+        from backend.services.indicator_service import get_gainzalgo_v3_signals
+        return get_gainzalgo_v3_signals(highs, lows, closes)
+    except Exception as e:
+        return {
+            "signal": "ERROR",
+            "score": 0,
+            "rsi": 50.0,
+            "stop_loss": 0.0,
+            "take_profit": 0.0,
+            "details": f"Indicators calculation error: {str(e)}"
+        }

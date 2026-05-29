@@ -4,6 +4,8 @@ import { listConfiguredProviders, getRegistryState } from '../services/ai-provid
 import type { BrokerAccountSummary } from '../types/broker'
 import type { ComplianceBundle, ProviderSettingStatus, UserSettings } from '../types/settings'
 
+const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
+
 interface Props {
   settings: UserSettings | null
   compliance: ComplianceBundle | null
@@ -11,9 +13,18 @@ interface Props {
   providers: ProviderSettingStatus[]
   onManageProviders: () => void
   onAcknowledgeRisk: () => void
+  onUpdateSettings?: (updates: Partial<UserSettings>) => Promise<void>
 }
 
-export default function SettingsPanel({ settings, compliance, brokerAccount, providers, onManageProviders, onAcknowledgeRisk }: Props) {
+export default function SettingsPanel({
+  settings,
+  compliance,
+  brokerAccount,
+  providers,
+  onManageProviders,
+  onAcknowledgeRisk,
+  onUpdateSettings,
+}: Props) {
   return (
     <div className="space-y-8">
       <div className="p-10 bg-white/5 border border-white/10 rounded-[3rem] space-y-8">
@@ -22,6 +33,7 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
           <h2 className="text-xl font-black uppercase italic">Compliance & Configuration</h2>
         </div>
 
+        {/* Secret Handling / Risk Disclosure */}
         <div className="p-6 bg-cyan-400/5 border border-cyan-400/20 rounded-2xl space-y-4">
           <p className="text-xs font-bold text-cyan-400 uppercase">Secret handling</p>
           <p className="text-[10px] text-gray-400 leading-relaxed">
@@ -38,6 +50,7 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
           </div>
         </div>
 
+        {/* LLM Providers Management */}
         <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -64,6 +77,7 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
           </div>
         </div>
 
+        {/* AI Provider Registry */}
         <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
           <div className="flex items-center space-x-3">
             <Cpu size={18} className="text-cyan-400" />
@@ -100,6 +114,7 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
           </div>
         </div>
 
+        {/* Debug Environment Keys */}
         <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
           <p className="text-xs font-bold text-cyan-400 uppercase">Environment Keys</p>
           <p className="text-[10px] text-gray-400 leading-relaxed">
@@ -136,24 +151,112 @@ export default function SettingsPanel({ settings, compliance, brokerAccount, pro
           </div>
         </div>
 
-        <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-3">
-          <p className="text-xs font-bold text-cyan-400 uppercase">Broker account intelligence</p>
+        {/* Zerodha Kite Broker configuration */}
+        <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-4">
+          <div className="flex items-center space-x-3">
+            <Cpu size={18} className="text-cyan-400" />
+            <p className="text-xs font-bold text-cyan-400 uppercase">Broker Account Intelligence (Zerodha Kite)</p>
+          </div>
           <p className="text-[10px] text-gray-400 leading-relaxed">
-            Broker access is intentionally read-only. FinIntel does not place, modify, or cancel orders. The connection is used only for portfolio context in analytics.
+            Broker connection is read-only. FinIntel never places, modifies, or cancels trading orders. This data is leveraged strictly for asset valuation context and AI risk modeling.
           </p>
-          <p className="text-sm text-gray-300">{brokerAccount?.message ?? 'Broker summary not loaded yet.'}</p>
-          {brokerAccount && brokerAccount.status === 'connected' && (
-            <div className="grid grid-cols-4 gap-4">
-              <div><p className="text-[10px] font-black uppercase text-gray-500">Investment</p><p className="text-sm font-bold text-white">₹{brokerAccount.total_investment.toLocaleString()}</p></div>
-              <div><p className="text-[10px] font-black uppercase text-gray-500">Current Value</p><p className="text-sm font-bold text-white">₹{brokerAccount.current_value.toLocaleString()}</p></div>
-              <div><p className="text-[10px] font-black uppercase text-gray-500">Cash</p><p className="text-sm font-bold text-white">₹{brokerAccount.available_cash.toLocaleString()}</p></div>
-              <div><p className="text-[10px] font-black uppercase text-gray-500">PnL</p><p className="text-sm font-bold text-white">₹{brokerAccount.pnl.toLocaleString()}</p></div>
+          
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault()
+              const fd = new FormData(e.currentTarget)
+              const apiKey = fd.get('api_key') as string
+              const accessToken = fd.get('access_token') as string
+              const enabled = fd.get('enabled') === 'true'
+              if (onUpdateSettings) {
+                try {
+                  await onUpdateSettings({
+                    zerodha_api_key: apiKey,
+                    zerodha_access_token: accessToken,
+                    zerodha_enabled: enabled,
+                  })
+                  alert('Zerodha credentials saved. Refreshing broker metrics...')
+                  window.location.reload()
+                } catch {
+                  alert('Failed to update credentials settings.')
+                }
+              }
+            }}
+            className="space-y-4 bg-black/30 p-5 rounded-2xl border border-white/5"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[9px] font-black uppercase text-gray-500 mb-1">Zerodha API Key</label>
+                <input
+                  type="text"
+                  name="api_key"
+                  defaultValue={settings?.zerodha_api_key ?? ''}
+                  placeholder="Enter API Key"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-cyan-300 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[9px] font-black uppercase text-gray-500 mb-1">Zerodha Access Token</label>
+                <input
+                  type="password"
+                  name="access_token"
+                  defaultValue={settings?.zerodha_access_token ?? ''}
+                  placeholder="Enter Access Token"
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-cyan-300 focus:outline-none"
+                />
+              </div>
             </div>
-          )}
+            
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="zerodha_enabled"
+                  name="enabled"
+                  value="true"
+                  defaultChecked={settings?.zerodha_enabled ?? false}
+                  className="rounded border-white/10 bg-black/40 text-cyan-300 focus:ring-0 cursor-pointer"
+                />
+                <label htmlFor="zerodha_enabled" className="text-[10px] font-bold text-gray-400 uppercase cursor-pointer select-none">
+                  Enable Zerodha Read-only connection
+                </label>
+              </div>
+              <button type="submit" className="rounded-xl bg-cyan-300 px-5 py-2 text-[10px] font-black uppercase text-black hover:bg-cyan-200 transition-colors">
+                Connect Accounts
+              </button>
+            </div>
+          </form>
+
+          <div className="border-t border-white/5 pt-4">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Connection Status</p>
+            <p className="text-sm text-gray-300">{brokerAccount?.message ?? 'Broker summary not loaded yet.'}</p>
+            {brokerAccount && brokerAccount.status === 'connected' && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 bg-black/30 p-4 rounded-xl border border-white/5">
+                <div>
+                  <p className="text-[9px] font-black uppercase text-gray-500">Invested Capital</p>
+                  <p className="text-sm font-bold text-white mt-1">₹{brokerAccount.total_investment.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase text-gray-500">Current Valuation</p>
+                  <p className="text-sm font-bold text-white mt-1">₹{brokerAccount.current_value.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase text-gray-500">Cash Balance</p>
+                  <p className="text-sm font-bold text-white mt-1">₹{brokerAccount.available_cash.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase text-gray-500">Net Profit/Loss</p>
+                  <p className={cn('text-sm font-bold mt-1', brokerAccount.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                    ₹{brokerAccount.pnl.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {compliance && (
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-6 bg-white/5 border border-white/10 rounded-2xl space-y-3">
               <div className="flex items-center space-x-3">
                 <FileText className="text-cyan-400 shrink-0" size={18} />

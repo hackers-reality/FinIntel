@@ -7,7 +7,7 @@ The Sovereign Intelligence Nexus is built as an institutional-grade, local-first
 - **Tactical Interface (Frontend):** React SPA using Tailwind CSS, Framer Motion (Nexus Animations), and Lucide Strategic Icons.
 - **Intelligence Kernel (Backend):** FastAPI (Python 3.10+) serving as the orchestration layer for the Data Mesh and Reasoning Mesh.
 - **The Nexus Database:** SQLite serving as the single source of truth for portfolio, history, and institutional trends.
-- **The Encrypted Vault:** AES-256 (Fernet) encryption for all strategic API keys at rest (`secret.key`).
+- **The Encrypted Vault:** AES-128-CBC (Fernet) encryption for all strategic API keys at rest (`secret.key`).
 
 ## 2. Intelligence Mesh Architecture
 1. **The Tactical Layer:** Direct KiteConnect integration for live holdings and position tracking.

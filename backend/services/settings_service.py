@@ -5,15 +5,69 @@ from openai import OpenAI
 
 from backend.database.db import db_cursor
 from backend.schemas.settings import UserSettings, UserSettingsUpdate
-from backend.security.crypto import get_fernet
+from backend.security.crypto import encrypt, decrypt
 
 
 SUPPORTED_PROVIDERS = {
+    "nvidia_nim": {"base_url": "https://integrate.api.nvidia.com/v1"},
     "openai": {"base_url": None},
+    "anthropic": {"base_url": "https://api.anthropic.com/v1"},
     "groq": {"base_url": "https://api.groq.com/openai/v1"},
-    "nvidia": {"base_url": "https://integrate.api.nvidia.com/v1"},
-    "custom": {"base_url": None},
+    "openrouter": {"base_url": "https://openrouter.ai/api/v1"},
 }
+
+
+def verify_provider_key(provider: str, key: str) -> bool:
+    """Verify a provider API key is valid."""
+    provider = provider.strip().lower()
+    if provider == "nvidia_nim":
+        import requests
+        try:
+            resp = requests.get(
+                "https://integrate.api.nvidia.com/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=10,
+            )
+            return resp.status_code == 200
+        except Exception:
+            return False
+    elif provider == "anthropic":
+        import anthropic
+        try:
+            client = anthropic.Anthropic(api_key=key)
+            # Minimal call - just check auth, not actual generation
+            resp = client.messages.create(
+                model="claude-3-haiku-20240307",
+                max_tokens=1,
+                messages=[{"role": "user", "content": "Hi"}],
+            )
+            return True
+        except Exception:
+            return False
+    elif provider == "groq":
+        import requests
+        try:
+            resp = requests.get(
+                "https://api.groq.com/openai/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=10,
+            )
+            return resp.status_code == 200
+        except Exception:
+            return False
+    elif provider == "openrouter":
+        import requests
+        try:
+            resp = requests.get(
+                "https://openrouter.ai/api/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+                timeout=10,
+            )
+            return resp.status_code == 200
+        except Exception:
+            return False
+    # OpenAI - keep existing logic
+    return True
 
 
 DEFAULT_SETTINGS = UserSettings()
@@ -81,7 +135,7 @@ def upsert_provider_setting(provider: str, api_key: str, base_url: str | None, m
     if normalized not in SUPPORTED_PROVIDERS:
         raise ValueError("Unsupported provider.")
 
-    encrypted_key = get_fernet().encrypt(api_key.encode("utf-8")).decode("utf-8")
+    encrypted_key = encrypt(api_key)
     with db_cursor() as cursor:
         cursor.execute(
             """
@@ -124,22 +178,22 @@ def verify_provider_setting(provider: str) -> dict[str, str | bool | None]:
     if row is None:
         raise ValueError("Provider key is not configured.")
 
-    decrypted_key = get_fernet().decrypt(row["encrypted_key"].encode("utf-8")).decode("utf-8")
+    decrypted_key = decrypt(row["encrypted_key"])
     provider_defaults = SUPPORTED_PROVIDERS.get(normalized, {})
     base_url = row["base_url"] or provider_defaults.get("base_url")
-    model = row["model"] or "gpt-4.1-mini"
+    model = row["model"] or _default_model(normalized)
 
-    try:
-        client = OpenAI(api_key=decrypted_key, base_url=base_url)
-        models = client.models.list()
-        model_count = len(getattr(models, "data", []) or [])
+    # Use the new verification function
+    is_valid = verify_provider_key(normalized, decrypted_key)
+
+    if is_valid:
         verified_at = datetime.now(timezone.utc).isoformat()
         status = "verified"
-        message = f"Provider key validated successfully. {model_count} models were reachable."
-    except Exception as exc:
+        message = "Provider key validated successfully."
+    else:
         verified_at = None
         status = "failed"
-        message = f"Verification failed: {exc}"
+        message = "Verification failed: Invalid API key or unreachable endpoint."
 
     with db_cursor() as cursor:
         cursor.execute(
@@ -160,3 +214,64 @@ def verify_provider_setting(provider: str) -> dict[str, str | bool | None]:
         "verification_status": status,
         "verification_message": message,
     }
+
+
+def _default_model(provider: str) -> str:
+    defaults = {
+        "nvidia_nim": "meta/llama-3.1-70b-instruct",
+        "openai": "gpt-4o",
+        "anthropic": "claude-sonnet-4-20250514",
+        "groq": "llama-3.3-70b-versatile",
+        "openrouter": "meta-llama/llama-3.1-70b-instruct",
+    }
+    return defaults.get(provider, "gpt-4o")
+
+
+def fetch_models_from_provider(provider: str, api_key: str | None = None, base_url: str | None = None) -> list[str]:
+    provider = provider.strip().lower()
+    provider_defaults = SUPPORTED_PROVIDERS.get(provider, {})
+    url = base_url or provider_defaults.get("base_url")
+
+    if not api_key:
+        with db_cursor() as cursor:
+            cursor.execute(
+                "SELECT encrypted_key, base_url FROM provider_settings WHERE provider = ?",
+                (provider,)
+            )
+            row = cursor.fetchone()
+            if row and row["encrypted_key"]:
+                api_key = decrypt(row["encrypted_key"])
+                if not url:
+                    url = row["base_url"]
+
+    if not api_key:
+        return []
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    if provider == "openai":
+        url = url or "https://api.openai.com/v1"
+    elif provider == "anthropic":
+        return [
+            "claude-3-5-sonnet-latest",
+            "claude-3-5-haiku-latest",
+            "claude-3-opus-20240229",
+            "claude-3-sonnet-20240229",
+            "claude-3-haiku-20240307",
+        ]
+
+    # Clean up URL for /models
+    if not url.endswith("/models"):
+        url = url.rstrip("/") + "/models"
+
+    import requests
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "data" in data:
+                return [m["id"] for m in data["data"] if "id" in m]
+    except Exception:
+        pass
+
+    return []

@@ -52,7 +52,7 @@ export function useMarketData() {
     try {
       const [overview, quotes, currencies, sectors, news, flows, bulkDeals, events, alerts, chart] = await Promise.all([
         marketService.getOverview(),
-        marketService.getQuotes(),
+        marketService.getQuotes('RELIANCE.NS,TCS.NS,INFY.NS,HDFCBANK.NS,WIPRO.NS'),
         marketService.getCurrencies(),
         marketService.getSectors(),
         marketService.getNews(),
@@ -86,7 +86,7 @@ export function useMarketData() {
 
   useEffect(() => {
     void refresh()
-    const interval = window.setInterval(() => void refresh(), 60000)
+    const interval = window.setInterval(() => void refresh(), 30000)
     return () => window.clearInterval(interval)
   }, [refresh])
 

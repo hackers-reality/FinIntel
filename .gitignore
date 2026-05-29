@@ -30,3 +30,10 @@ system.log
 backend/system.log
 backend/__pycache__/
 backend/*.db
+*.db
+server_pid.xml
+reports/
+__pycache__/
+*.pyc
+dist/
+node_modules/

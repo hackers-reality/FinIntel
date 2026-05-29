@@ -1,8 +1,9 @@
 import json
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timezone, timedelta
 from typing import Generator
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
 from slowapi import Limiter
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,8 @@ from backend.schemas.auth import (
     UserLogin,
     UserProfile,
     UserRegister,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from backend.security.jwt import create_access_token, create_refresh_token, decode_access_token, decode_refresh_token
 from backend.security.mfa import generate_backup_codes, generate_mfa_secret, generate_mfa_uri, verify_mfa_token
@@ -29,6 +32,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=lambda request: request.client.host if request and request.client else "unknown")
 
 _revoked_tokens_set: set[str] = set()
+_reset_codes: dict[str, dict] = {}
 
 
 def _is_token_revoked(token: str) -> bool:
@@ -50,9 +54,10 @@ def _is_token_revoked(token: str) -> bool:
 
 
 def get_current_user(
-    authorization: str | None = None,
+    authorization: str | None = Header(None),
     db: Session = Depends(get_db),
 ) -> User:
+    print(f"[DEBUG] get_current_user - authorization: {authorization}")
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid Authorization header.")
     token = authorization.split(" ", 1)[1]
@@ -66,7 +71,7 @@ def get_current_user(
 
 
 def get_current_user_from_header(
-    authorization: str | None = None,
+    authorization: str | None = Header(None),
     db: Session = Depends(get_db),
 ) -> User:
     return get_current_user(authorization, db)
@@ -184,3 +189,52 @@ def change_password(payload: PasswordChange, user: User = Depends(get_current_us
     user.hashed_password = hash_password(payload.new_password)
     db.commit()
     return {"success": True, "message": "Password changed successfully."}
+
+
+@router.post("/forgot-password")
+@limiter.limit("5/minute")
+def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)) -> dict:
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        # Return success to prevent enumeration, but do not generate any code
+        return {"success": True, "message": "If the email exists, a password reset code has been sent/logged."}
+    
+    code = f"{random.randint(100000, 999999)}"
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    _reset_codes[payload.email] = {
+        "code": code,
+        "expires_at": expires_at
+    }
+    
+    # Print the verification code directly to the server terminal console/logs
+    print(f"\n[SECURITY ALERT] Password reset requested for {payload.email}.")
+    print(f"[SECURITY ALERT] Verification code: {code}")
+    print(f"[SECURITY ALERT] Expires in 15 minutes.\n")
+    
+    return {"success": True, "message": "Verification code generated. Please check server logs/console."}
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+def reset_password(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
+    stored = _reset_codes.get(payload.email)
+    if not stored:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No reset code found or code expired.")
+    
+    if stored["expires_at"] < datetime.now(timezone.utc):
+        _reset_codes.pop(payload.email, None)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset code has expired.")
+        
+    if stored["code"] != payload.code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification code.")
+        
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+        
+    user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    
+    _reset_codes.pop(payload.email, None)
+    
+    return {"success": True, "message": "Password reset successfully."}

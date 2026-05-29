@@ -14,18 +14,47 @@ READ_ONLY_MODE = "read-only"
 
 
 def get_broker_account_summary() -> BrokerAccountSummary:
-    if os.getenv("FININTEL_ENABLE_BROKER_READONLY", "false").lower() != "true":
+    # Read from database
+    db_api_key = ""
+    db_access_token = ""
+    db_enabled = "false"
+    
+    try:
+        from backend.database.db import get_connection
+        import json
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM user_settings WHERE key = 'zerodha_api_key'")
+            row = cursor.fetchone()
+            if row:
+                db_api_key = json.loads(row["value"])
+            cursor.execute("SELECT value FROM user_settings WHERE key = 'zerodha_access_token'")
+            row = cursor.fetchone()
+            if row:
+                db_access_token = json.loads(row["value"])
+            cursor.execute("SELECT value FROM user_settings WHERE key = 'zerodha_enabled'")
+            row = cursor.fetchone()
+            if row:
+                db_enabled = str(json.loads(row["value"])).lower()
+    except Exception:
+        pass
+
+    env_enabled = os.getenv("FININTEL_ENABLE_BROKER_READONLY", "false").lower() == "true"
+    is_enabled = env_enabled or db_enabled == "true"
+
+    if not is_enabled:
         return BrokerAccountSummary(
             provider="zerodha",
             status="disabled",
             mode=READ_ONLY_MODE,
-            message="Broker sync is disabled. Enable FININTEL_ENABLE_BROKER_READONLY and provide read-only credentials to fetch account details.",
+            message="Broker sync is disabled. Enable Zerodha connection in Settings and provide read-only credentials to fetch account details.",
         )
 
-    api_key = os.getenv("ZERODHA_API_KEY", "").strip()
-    access_token = os.getenv("ZERODHA_ACCESS_TOKEN", "").strip()
+    api_key = db_api_key if db_api_key else os.getenv("ZERODHA_API_KEY", "").strip()
+    access_token = db_access_token if db_access_token else os.getenv("ZERODHA_ACCESS_TOKEN", "").strip()
     api_secret = os.getenv("ZERODHA_API_SECRET", "").strip()
     request_token = os.getenv("ZERODHA_REQUEST_TOKEN", "").strip()
+    
     if api_secret or request_token:
         return BrokerAccountSummary(
             provider="zerodha",
@@ -38,7 +67,7 @@ def get_broker_account_summary() -> BrokerAccountSummary:
             provider="zerodha",
             status="unavailable",
             mode=READ_ONLY_MODE,
-            message="Broker sync requires ZERODHA_API_KEY and ZERODHA_ACCESS_TOKEN in the environment.",
+            message="Broker sync requires ZERODHA_API_KEY and ZERODHA_ACCESS_TOKEN configured in Settings or in the environment.",
         )
 
     kite = KiteConnect(api_key=api_key)

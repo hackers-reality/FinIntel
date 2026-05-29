@@ -6,6 +6,13 @@ export interface AIProviderConfig {
   envKey: string
   defaultModel: string
   extraHeaders?: Record<string, string>
+  // Display/metadata fields for UI rendering
+  id?: string
+  description?: string
+  models?: string[]
+  apiKeyLabel?: string
+  docsUrl?: string
+  badge?: string
 }
 
 export interface AIProvider {

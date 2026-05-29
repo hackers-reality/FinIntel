@@ -10,6 +10,22 @@ import { DEFAULT_ROLE_PRIORITY } from '../types/ai-provider'
 
 const PROVIDER_CONFIGS: AIProviderConfig[] = [
   {
+    name: 'nvidia_nim',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    envKey: 'NVIDIA_NIM_API_KEY',
+    defaultModel: 'meta/llama-3.1-70b-instruct',
+    id: 'nvidia_nim',
+    description: 'Ultra-low latency inference via NVIDIA cloud microservices',
+    models: [
+      'meta/llama-3.1-70b-instruct',
+      'nvidia/llama-3.1-nemotron-70b-instruct',
+      'mistralai/mixtral-8x7b-instruct-v0.1',
+    ],
+    apiKeyLabel: 'NVIDIA API Key',
+    docsUrl: 'https://build.nvidia.com',
+    badge: 'Primary',
+  },
+  {
     name: 'anthropic',
     baseUrl: 'https://api.anthropic.com/v1',
     envKey: 'ANTHROPIC_API_KEY',
@@ -61,6 +77,7 @@ const PROVIDER_CONFIGS: AIProviderConfig[] = [
 ]
 
 const ROLE_MAP: Record<string, TaskRole[]> = {
+  nvidia_nim: ['orchestrator', 'reasoning', 'speed'],
   anthropic: ['orchestrator', 'reasoning', 'creative'],
   openai: ['orchestrator', 'reasoning', 'speed', 'creative'],
   google: ['orchestrator', 'reasoning', 'creative'],
@@ -73,7 +90,7 @@ const ROLE_MAP: Record<string, TaskRole[]> = {
 
 let state: ProviderRegistryState = {
   providers: [],
-  preferred: 'anthropic',
+  preferred: 'nvidia_nim',
   roleRouting: DEFAULT_ROLE_PRIORITY,
 }
 
@@ -95,7 +112,7 @@ export function initProviderRegistry(
 ): ProviderRegistryState {
   state = {
     providers: buildProviders(apiKeys, models),
-    preferred: 'anthropic',
+    preferred: 'nvidia_nim',
     roleRouting: DEFAULT_ROLE_PRIORITY,
   }
   return state

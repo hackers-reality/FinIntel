@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Shield, Command, BarChart3, MessageSquare } from 'lucide-react'
+import { Shield, Command, BarChart3, MessageSquare, TrendingUp, PieChart, Briefcase, FileText, Database, Settings } from 'lucide-react'
+import { API_BASE_URL } from '../constants/api'
 
 import { useAuth } from '../hooks/useAuth'
 import { useBroker } from '../hooks/useBroker'
@@ -22,10 +23,12 @@ import SettingsPanel from './SettingsPanel'
 import AIChat from './AIChat'
 import LoginForm from './LoginForm'
 import RegisterForm from './RegisterForm'
+import SentinelWidget from './SentinelWidget'
+import OpportunitiesVault from './OpportunitiesVault'
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
-type DashboardTab = 'market' | 'sectors' | 'portfolio' | 'research' | 'settings' | 'risk' | 'chat'
+type DashboardTab = 'market' | 'sectors' | 'portfolio' | 'research' | 'chat' | 'risk' | 'sentinel' | 'vault' | 'settings'
 type ChartMode = 'line' | 'area' | 'candle'
 
 export default function Dashboard() {
@@ -52,22 +55,36 @@ export default function Dashboard() {
     setSelectedSymbol,
     isLoading: isMarketLoading,
     error: marketError,
+    chartPeriod,
+    chartInterval,
+    refreshChart,
   } = useMarketData()
   const { portfolio, newHolding, setNewHolding, addHolding, error: portfolioError } = usePortfolio(isAuthenticated ? accessToken : null)
   const {
     researchTicker,
     setResearchTicker,
+    researchQuery,
+    setResearchQuery,
     documentText,
     setDocumentText,
     researchResult,
+    megaReportContent,
+    megaReportHistory,
+    activeReportId,
     behavior,
     companyIntel,
     portfolioContext,
     documentRisk,
     isResearching,
     isAnalyzing,
+    isSavingOpportunity,
     error: researchError,
     runResearch,
+    runMegaReport,
+    loadHistory,
+    loadReportById,
+    saveOpportunity,
+    downloadReportPdf,
     analyzeDocument,
   } = useResearch(isAuthenticated ? accessToken : null)
   const [compliance, setCompliance] = useState<ComplianceBundle | null>(null)
@@ -150,6 +167,12 @@ export default function Dashboard() {
     })
   }, [isAuthenticated, accessToken])
 
+  useEffect(() => {
+    if (isAuthenticated && accessToken && activeTab === 'research') {
+      void loadHistory()
+    }
+  }, [isAuthenticated, accessToken, activeTab, loadHistory])
+
   async function acknowledgeRisk() {
     if (!isAuthenticated || !accessToken) return
     try {
@@ -158,6 +181,17 @@ export default function Dashboard() {
       setSettingsError(null)
     } catch {
       setSettingsError('Unable to update the compliance acknowledgment.')
+    }
+  }
+
+  async function handleUpdateSettings(updates: Partial<UserSettings>) {
+    if (!isAuthenticated || !accessToken) return
+    try {
+      const updatedSettings = await settingsService.updateSettings(updates, accessToken)
+      setSettings(updatedSettings)
+      setSettingsError(null)
+    } catch {
+      setSettingsError('Unable to update settings.')
     }
   }
 
@@ -182,7 +216,7 @@ export default function Dashboard() {
   async function handleAskAI(question: string, context?: string): Promise<string> {
     if (!isAuthenticated || !accessToken) return 'Please log in to use AI features.'
     try {
-      const response = await fetch(`${window.location.origin.replace(':3000', ':8008')}/api/research/ask`, {
+      const response = await fetch(`${API_BASE_URL}/api/research/ask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -242,12 +276,27 @@ export default function Dashboard() {
           <div className={cn('px-4 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest', marketStatus === 'OPEN' ? 'border-emerald-400/30 text-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_#10b98110]' : 'border-rose-400/30 text-rose-400')}>Market {marketStatus}</div>
         </div>
         <div className="flex items-center space-x-3">
-          <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10">
-            {(['market', 'sectors', 'portfolio', 'research', 'chat', 'risk', 'settings'] as DashboardTab[]).map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>
-                {tab === 'risk' ? <BarChart3 size={12} /> : tab === 'chat' ? <MessageSquare size={12} /> : tab}
-              </button>
-            ))}
+          <div className="flex space-x-1 bg-white/5 p-1 rounded-xl border border-white/10 max-w-full overflow-x-auto">
+            {(['market', 'sectors', 'portfolio', 'research', 'chat', 'risk', 'sentinel', 'vault', 'settings'] as DashboardTab[]).map((tab) => {
+              const getTabContent = () => {
+                switch (tab) {
+                  case 'market': return <span className="flex items-center space-x-1"><TrendingUp size={12} /> <span className="hidden xl:inline">Market</span></span>
+                  case 'sectors': return <span className="flex items-center space-x-1"><PieChart size={12} /> <span className="hidden xl:inline">Sectors</span></span>
+                  case 'portfolio': return <span className="flex items-center space-x-1"><Briefcase size={12} /> <span className="hidden xl:inline">Portfolio</span></span>
+                  case 'research': return <span className="flex items-center space-x-1"><FileText size={12} /> <span className="hidden xl:inline">Research</span></span>
+                  case 'chat': return <span className="flex items-center space-x-1"><MessageSquare size={12} /> <span className="hidden xl:inline">Chat</span></span>
+                  case 'risk': return <span className="flex items-center space-x-1"><BarChart3 size={12} /> <span className="hidden xl:inline">Risk</span></span>
+                  case 'sentinel': return <span className="flex items-center space-x-1"><Shield size={12} /> <span className="hidden xl:inline">Sentinel</span></span>
+                  case 'vault': return <span className="flex items-center space-x-1"><Database size={12} /> <span className="hidden xl:inline">Vault</span></span>
+                  case 'settings': return <span className="flex items-center space-x-1"><Settings size={12} /> <span className="hidden xl:inline">Settings</span></span>
+                }
+              }
+              return (
+                <button key={tab} onClick={() => setActiveTab(tab)} className={cn('px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all', activeTab === tab ? 'bg-white/10 text-white' : 'text-gray-500')}>
+                  {getTabContent()}
+                </button>
+              )
+            })}
           </div>
           <button onClick={() => setCommandPaletteOpen(true)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-gray-500 hover:text-white transition-colors" title="Command Palette (Cmd+K)">
             <Command size={16} />
@@ -278,6 +327,10 @@ export default function Dashboard() {
             onSelectSymbol={setSelectedSymbol}
             chartMode={chartMode}
             setChartMode={setChartMode}
+            chartPeriod={chartPeriod}
+            chartInterval={chartInterval}
+            refreshChart={refreshChart}
+            onAskAI={handleAskAI}
           />
         )}
         {activeTab === 'sectors' && <SectorPanel sectors={sectors} />}
@@ -286,9 +339,19 @@ export default function Dashboard() {
           <ResearchPanel
             researchTicker={researchTicker}
             setResearchTicker={setResearchTicker}
+            researchQuery={researchQuery}
+            setResearchQuery={setResearchQuery}
             runResearch={runResearch}
+            runMegaReport={runMegaReport}
             isResearching={isResearching}
             researchResult={researchResult}
+            megaReportContent={megaReportContent}
+            megaReportHistory={megaReportHistory}
+            loadReportById={loadReportById}
+            saveOpportunity={saveOpportunity}
+            isSavingOpportunity={isSavingOpportunity}
+            downloadReportPdf={downloadReportPdf}
+            activeReportId={activeReportId}
             behavior={behavior}
             companyIntel={companyIntel}
             portfolioContext={portfolioContext}
@@ -306,10 +369,11 @@ export default function Dashboard() {
             behavior={behavior}
             companyIntel={companyIntel}
             documentRisk={documentRisk}
-            onAskQuestion={handleAskAI}
-            isLoading={isResearching}
+            accessToken={accessToken}
           />
         )}
+        {activeTab === 'sentinel' && <SentinelWidget accessToken={accessToken} />}
+        {activeTab === 'vault' && <OpportunitiesVault accessToken={accessToken} />}
         {activeTab === 'settings' && (
           <SettingsPanel
             settings={settings}
@@ -318,6 +382,7 @@ export default function Dashboard() {
             providers={providers}
             onManageProviders={() => setProviderModalOpen(true)}
             onAcknowledgeRisk={acknowledgeRisk}
+            onUpdateSettings={handleUpdateSettings}
           />
         )}
         {activeTab === 'risk' && riskState && <RiskPanel riskState={riskState} />}
