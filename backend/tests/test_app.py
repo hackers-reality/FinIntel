@@ -13,6 +13,7 @@ class AppTestCase(unittest.TestCase):
         cls.tempdir = tempfile.TemporaryDirectory()
         os.environ["FININTEL_DB_PATH"] = str(Path(cls.tempdir.name) / "test.db")
         os.environ["FININTEL_APP_SECRET"] = "test-secret"
+        os.environ["FININTEL_TESTING"] = "true"
 
         from backend.app import create_app
         from backend.database.db import init_db
@@ -24,6 +25,7 @@ class AppTestCase(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls) -> None:
+        cls.client.close()
         cls.tempdir.cleanup()
 
     def test_healthcheck(self) -> None:

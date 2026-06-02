@@ -102,7 +102,7 @@ export default function PriceChart({ points, mode }: Props) {
       </div>
 
       {/* Horizontal scroll wrap container */}
-      <div className="relative overflow-x-auto w-full select-none border border-white/10 rounded-[2rem] bg-[#060b14] scrollbar-thin scrollbar-thumb-white/10">
+      <div className="relative overflow-x-auto w-full max-w-full select-none border border-white/10 rounded-[2rem] bg-[#060b14] scrollbar-thin scrollbar-thumb-white/10">
         <div style={{ width: `${width}px`, minWidth: '100%' }}>
           <svg
             viewBox={`0 0 ${width} ${HEIGHT}`}

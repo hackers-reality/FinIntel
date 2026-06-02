@@ -1,56 +1,50 @@
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request
 
 router = APIRouter(prefix="/api/sentinel", tags=["sentinel"])
 
+
+def _get_sentinel(request: Request):
+    sentinel = getattr(request.app.state, "sentinel", None)
+    return sentinel
+
+
 @router.get("/status")
 def get_status(request: Request) -> dict:
-    try:
-        sentinel = getattr(request.app.state, "sentinel", None)
-        if not sentinel:
-            return {"error": "Sentinel service not initialized"}
-        return sentinel.get_status()
-    except Exception as e:
-        return {"error": str(e)}
+    s = _get_sentinel(request)
+    if s is None:
+        return {"running": False, "error": "Sentinel not initialized"}
+    return s.get_status()
+
 
 @router.post("/scan")
-async def run_scan(request: Request):
-    try:
-        sentinel = getattr(request.app.state, "sentinel", None)
-        if not sentinel:
-            return {"error": "Sentinel service not initialized"}
-        return await sentinel.run_scan()
-    except Exception as e:
-        return {"error": str(e)}
+async def trigger_scan(request: Request) -> list[dict]:
+    s = _get_sentinel(request)
+    if s is None:
+        return []
+    return await s.run_scan()
+
 
 @router.get("/findings")
-def get_findings(request: Request):
-    try:
-        sentinel = getattr(request.app.state, "sentinel", None)
-        if not sentinel:
-            return {"error": "Sentinel service not initialized"}
-        return sentinel.findings[-20:]
-    except Exception as e:
-        return {"error": str(e)}
+def get_findings(request: Request) -> list[dict]:
+    s = _get_sentinel(request)
+    if s is None:
+        return []
+    return s.findings[-20:]
 
-@router.post("/stop")
-async def stop_sentinel(request: Request):
-    try:
-        sentinel = getattr(request.app.state, "sentinel", None)
-        if not sentinel:
-            return {"error": "Sentinel service not initialized"}
-        await sentinel.stop()
-        return {"status": "stopped"}
-    except Exception as e:
-        return {"error": str(e)}
 
 @router.post("/start")
-async def start_sentinel(request: Request):
-    try:
-        sentinel = getattr(request.app.state, "sentinel", None)
-        if not sentinel:
-            return {"error": "Sentinel service not initialized"}
-        await sentinel.start()
-        return {"status": "started"}
-    except Exception as e:
-        return {"error": str(e)}
+async def start_sentinel(request: Request) -> dict:
+    s = _get_sentinel(request)
+    if s is None:
+        return {"error": "Sentinel not initialized"}
+    await s.start()
+    return {"status": "started"}
+
+
+@router.post("/stop")
+async def stop_sentinel(request: Request) -> dict:
+    s = _get_sentinel(request)
+    if s is None:
+        return {"error": "Sentinel not initialized"}
+    await s.stop()
+    return {"status": "stopped"}

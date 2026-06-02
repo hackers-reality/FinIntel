@@ -20,11 +20,11 @@ from backend.api.settings import router as settings_router, api_settings_router
 from backend.api.sentinel import router as sentinel_router
 from backend.api.opportunities import router as opportunities_router
 from backend.config.settings import get_settings
-from backend.database.db import get_connection, init_db, SessionLocal
+from backend.database.db import SessionLocal, get_connection, init_db
 from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
+from backend.services import sentinel_service as sentinel_module
 from backend.services.ws_service import market_data_stream_task, ws_endpoint
-from backend.services.sentinel_service import TitanSentinel
 
 
 logging.basicConfig(level=logging.INFO)
@@ -32,17 +32,29 @@ logger = logging.getLogger("finintel.api")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI):
     init_db()
     logger.info("FinIntel API started.")
-    sentinel = TitanSentinel(SessionLocal)
-    app.state.sentinel = sentinel
-    await sentinel.start()
-
     import asyncio
-    asyncio.create_task(market_data_stream_task())
+    import os
+
+    sentinel = None
+    if os.environ.get("FININTEL_TESTING") != "true":
+        asyncio.create_task(market_data_stream_task())
+
+        # Initialize Titan Sentinel
+        sentinel = sentinel_module.TitanSentinel(SessionLocal)
+        _.state.sentinel = sentinel
+        await sentinel.start()
+        logger.info("Titan Sentinel started.")
+    else:
+        _.state.sentinel = None
+
     yield
-    await sentinel.stop()
+
+    if sentinel:
+        await sentinel.stop()
+        logger.info("Titan Sentinel stopped.")
 
 
 def create_app() -> FastAPI:

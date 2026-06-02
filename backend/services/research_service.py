@@ -37,10 +37,16 @@ def _get_active_provider(db: Session) -> dict[str, str | None]:
     if row is None:
         return {}
     decrypted_key = decrypt(row.encrypted_key)
+    
+    base_url = row.base_url
+    if not base_url:
+        from backend.services.settings_service import SUPPORTED_PROVIDERS
+        base_url = SUPPORTED_PROVIDERS.get(row.provider, {}).get("base_url")
+
     return {
         "provider": row.provider,
         "api_key": decrypted_key,
-        "base_url": row.base_url,
+        "base_url": base_url,
         "model": row.model or _DEFAULT_MODELS.get(row.provider, "gpt-4o"),
     }
 
